@@ -25,6 +25,10 @@ struct sAppData {
             darr.clear();
             progress.reset();
         }
+
+        std::string getProgressInfo() const {
+            return *const_cast<std::string*>(&progress.info);
+        }
     } scan;
 
     // Data for functions: SelfTest, SetOP, Erase, Optimize, Clone
@@ -410,7 +414,8 @@ void MainWindow::handleScanDrive()
     std::stringstream sstr;
     sstr << "Scanning Done! Return Code: "
          << StorageApi::ToString(scan.progress.rval) << std::endl
-         << "Number of drives: " << scan.darr.size();
+         << "Number of drives: " << scan.darr.size() << std::endl;
+    sstr << "Progress info: " << scan.getProgressInfo() << std::endl;
     appendLog(QString(sstr.str().c_str()));
     showDriveList(); enableGui(true);
 }

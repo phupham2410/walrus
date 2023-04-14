@@ -41,6 +41,9 @@ static eRetCode ProcessTask(volatile sProgress* p, U32 load, eRetCode ret) {
 
 // --------------------------------------------------------------------------------
 
+
+// --------------------------------------------------------------------------------
+
 // This function is similar to DeviceMgr::ScanDriveCommon
 eRetCode StorageApi::ScanDrive(tDriveArray &darr, bool rid, bool rsm, volatile sProgress *p) {
     (void) rid; darr.clear();
