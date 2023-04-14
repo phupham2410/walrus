@@ -18,7 +18,7 @@ using namespace StorageApi;
 // Append log to volatile info
 #define PROGINFO(p) *const_cast<std::string*>(&p->info)
 static void AppendLog(volatile sProgress* p, CSTR& log) {
-    PROGINFO(p) = PROGINFO(p) + "\n" + log;
+    if (p) PROGINFO(p) = PROGINFO(p) + "\n" + log;
 }
 
 static eRetCode ProcessTask(volatile sProgress* p, U32 load, eRetCode ret) {
@@ -32,7 +32,7 @@ static eRetCode ProcessTask(volatile sProgress* p, U32 load, eRetCode ret) {
     return p->rval;
 }
 
-#define SKIP_AND_CONTINUE(prog, weight) { prog->progress += weight; continue; }
+#define SKIP_AND_CONTINUE(prog, weight) if (prog) { prog->progress += weight; continue; }
 
 #define UPDATE_AND_RETURN_IF_STOP(p, w, func, param, ret) \
     UPDATE_PROGRESS(p, w); FINALIZE_IF_STOP(p, func, param, ret)
