@@ -15,6 +15,12 @@
 // Real implementation of StorageApi
 using namespace StorageApi;
 
+// Append log to volatile info
+#define PROGINFO(p) *const_cast<std::string*>(&p->info)
+static void AppendLog(volatile sProgress* p, CSTR& log) {
+    PROGINFO(p) = PROGINFO(p) + "\n" + log;
+}
+
 static eRetCode ProcessTask(volatile sProgress* p, U32 load, eRetCode ret) {
     INIT_PROGRESS(p, load); // Prepare progress
     for (U32 i = 0; i < load; i++) {
@@ -40,7 +46,6 @@ static eRetCode ProcessTask(volatile sProgress* p, U32 load, eRetCode ret) {
 #include "StorageApiNvme.h"
 
 // --------------------------------------------------------------------------------
-
 
 // --------------------------------------------------------------------------------
 
