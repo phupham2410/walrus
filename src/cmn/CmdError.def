@@ -1,0 +1,10 @@
+MAP_ITEM(CMD_ERROR_NONE )
+MAP_ITEM(CMD_ERROR_OPEN ) // Cannot open device file
+MAP_ITEM(CMD_ERROR_IOCTL) // Ioctl error
+MAP_ITEM(CMD_ERROR_EXEC ) // The command is not executed
+MAP_ITEM(CMD_ERROR_CCTO ) // Command Completion Time Out
+MAP_ITEM(CMD_ERROR_EOM  ) // End of Media
+MAP_ITEM(CMD_ERROR_ABORT) // Abort
+MAP_ITEM(CMD_ERROR_IDNF ) // ID Not Found
+MAP_ITEM(CMD_ERROR_UNC  ) // Uncorrectable Error
+MAP_ITEM(CMD_ERROR_ICRC ) // Interface CRC
