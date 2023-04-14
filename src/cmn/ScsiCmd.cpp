@@ -33,7 +33,8 @@ void ScsiCmd::buildBasicCommand()
     if (true == isDataIn()) spt.DataIn = SCSI_IOCTL_DATA_IN;
     if (true == isDataOut()) spt.DataIn = SCSI_IOCTL_DATA_OUT;
 
-    buildScsiCmdBlock(spt.Cdb);
+    if (IsSat) buildSatCmdBlock(spt.Cdb);
+    else buildScsiCmdBlock(spt.Cdb);
 }
 
 bool ScsiCmd::buildCommand()
@@ -52,9 +53,20 @@ eCMDERR ScsiCmd::getErrorStatus()
 
 void ScsiCmd::setCommand(sADDRESS lba, U32 sectorCount, eSCSICODE cmdCode)
 {
+    setCommand(lba, sectorCount, (U32) cmdCode, false);
+}
+
+void ScsiCmd::setCommand(sADDRESS lba, U32 sectorCount, eATACODE cmdCode)
+{
+    setCommand(lba, sectorCount, (U32) cmdCode, true);
+}
+
+void ScsiCmd::setCommand(sADDRESS lba, U32 sectorCount, U32 cmdCode, bool isSat)
+{
     LBA = lba;
     SecCount = sectorCount;
     CmdCode = cmdCode;
+    IsSat = isSat;
 
     StructSize = sizeof (SYSTEM_DATA);
     FillerSize = 0;

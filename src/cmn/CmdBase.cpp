@@ -106,6 +106,11 @@ bool CmdBase::is48BitCmd() const // Write
     return ((CmdCode >> 26) & 0x3) == CMD_48B;
 }
 
+U8 CmdBase::getFeatureCode() const
+{
+    return (CmdCode >> 8) & 0xFF;
+}
+
 string CmdBase::getErrorString(eCMDERR code)
 {
     string errorString = "Unknown Error Code";

@@ -4,6 +4,7 @@
 #include "windows.h"
 #include "ntddscsi.h"
 #include "winioctl.h"
+#include "ntddstor.h"
 
 #include "DeviceMgr.h"
 #include "AtaCmd.h"
@@ -40,12 +41,75 @@ static eRetCode ProcessTask(volatile sProgress* p, U32 load, eRetCode ret) {
 #define TRY_TO_EXECUTE_COMMAND(hdl, cmd) \
     (cmd.executeCommand((int) hdl) && (CMD_ERROR_NONE == cmd.getErrorStatus()))
 
+static void UpdateAdapterInfo(const sAdapterInfo& src, sDriveInfo& dst) {
+    dst.bustype = src.BusType;
+    dst.maxtfsec = src.MaxTransferSector;
+}
+
+static void CloseDevice(sPHYDRVINFO& phy) {
+    return DeviceMgr::CloseDevice(phy);
+}
+
 // Bus-Specific utilities
 #include "StorageApiScsi.h"
 #include "StorageApiSata.h"
 #include "StorageApiNvme.h"
+#include "StorageApiUsb.h"
 
 // --------------------------------------------------------------------------------
+
+
+#include "ScsiCmd.h"
+
+static eRetCode ScanDrive_UsbBus(sPHYDRVINFO& phy, U32 index, bool rsm, sDriveInfo& di, volatile sProgress *p) {
+    sDRVINFO drv;
+
+    do {
+        // --------------------------------------------------
+        // Read Identify data
+
+        // Scsi command with ATA code
+        ScsiCmd cmd; cmd.setCommand(0, 1, CMD_IDENTIFY_DEVICE);
+        if (!TRY_TO_EXECUTE_COMMAND(phy.DriveHandle, cmd)) SKIP_AND_CONTINUE(p,5)
+
+        DeviceMgr::ParseIdentifyInfo(cmd.getBufferPtr(), phy.DriveName, drv.IdentifyInfo);
+        drv.IdentifyInfo.DriveIndex = index;
+        UPDATE_AND_RETURN_IF_STOP(p, 1, CloseDevice, phy, RET_ABORTED);
+
+        // --------------------------------------------------
+        // Testing for skipped drives
+
+        // --------------------------------------------------
+        // Testing for skipped drives
+
+        // --------------------------------------------------
+        // Read SMART data
+        if (!rsm) UPDATE_PROGRESS(p, 4);
+        else
+        {
+            U8 vbuf[SECTOR_SIZE]; U8 tbuf[SECTOR_SIZE];
+            cmd.setCommand(0, 1, CMD_SMART_READ_DATA);
+            if (!TRY_TO_EXECUTE_COMMAND(phy.DriveHandle, cmd)) SKIP_AND_CONTINUE(p,4)
+            memcpy(vbuf, cmd.getBufferPtr(), cmd.SecCount * SECTOR_SIZE);
+            UPDATE_AND_RETURN_IF_STOP(p, 1, CloseDevice, phy, RET_ABORTED);
+
+            cmd.setCommand(0, 1, CMD_SMART_READ_THRESHOLD);
+            if (!TRY_TO_EXECUTE_COMMAND(phy.DriveHandle, cmd)) SKIP_AND_CONTINUE(p,3)
+            memcpy(tbuf, cmd.getBufferPtr(), cmd.SecCount * SECTOR_SIZE);
+            UPDATE_AND_RETURN_IF_STOP(p, 1, CloseDevice, phy, RET_ABORTED);
+
+            DeviceMgr::ParseSmartData(vbuf, tbuf, drv.SmartInfo);
+            UPDATE_AND_RETURN_IF_STOP(p, 1, CloseDevice, phy, RET_ABORTED);
+        }
+
+        NsSata::UpdateDriveInfo(drv, di);
+
+        return RET_OK;
+    } while(0);
+
+    return RET_FAIL;
+}
+
 
 // --------------------------------------------------------------------------------
 
@@ -76,11 +140,20 @@ eRetCode StorageApi::ScanDrive(tDriveArray &darr, bool rid, bool rsm, volatile s
         sAdapterInfo adapter;
         if (GetDeviceInfo(phy.DriveHandle, adapter) != RET_OK) continue;
 
+        std::stringstream lstr;
+        lstr << "BusType: " << adapter.BusType; AppendLog(p, lstr.str());
+
         eRetCode ret; sDriveInfo di;
         switch(adapter.BusType) {
-            case 0x01: ret = ScanDrive_ScsiBus(phy, i, rsm, di, p); break; // 0x01: BusTypeScsi
-            case 0x0B: ret = ScanDrive_SataBus(phy, i, rsm, di, p); break; // 0x0B: BusTypeSata
-            case 0x11: ret = ScanDrive_NvmeBus(phy, i, rsm, di, p); break; // 0x11: BusTypeNvme
+            case 0x07: // 0x07: BusTypeUsb
+                ret = ScanDrive_UsbBus(phy, i, rsm, di, p); break;
+
+            case 0x0B: // 0x0B: BusTypeSata
+                ret = ScanDrive_SataBus(phy, i, rsm, di, p); break;
+
+            case 0x11: // 0x0B: BusTypeNvme
+                ret = ScanDrive_NvmeBus(phy, i, rsm, di, p); break;
+
             default: ret = RET_NOT_SUPPORT; break;
         }
 
@@ -90,7 +163,12 @@ eRetCode StorageApi::ScanDrive(tDriveArray &darr, bool rid, bool rsm, volatile s
         // accept drive
 
         UpdateAdapterInfo(adapter, di);
-        ScanPartition(phy.DriveHandle, di.pi);
+        ret = ScanPartition(phy.DriveHandle, di.pi);
+        if (ret != RET_OK) {
+            std::stringstream sstr;
+                sstr << "Cannot read partition info; ret=" << std::hex << ret;
+            AppendLog(p, sstr.str());
+        }
         UPDATE_PROGRESS(p, 1);
 
         darr.push_back(di); DeviceMgr::CloseDevice(phy);

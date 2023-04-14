@@ -20,10 +20,15 @@ public:
     void buildCmdBlock_Write10(U8* cmdb);
 
 public:
+    void buildSatCmdBlock(U8* sat);
     void buildScsiCmdBlock(U8* cmdb);
 
 public:
     std::string toString() const;
+
+public:
+    bool IsSat;
+    void setCommand(sADDRESS lba, U32 sectorCount, U32 cmdCode, bool isSat);
 };
 
 #endif // ScsiBase_H

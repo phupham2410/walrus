@@ -83,6 +83,8 @@ public:
     bool isDataOut() const;
     bool is48BitCmd() const;
     bool hasTransfer() const;
+
+    U8   getFeatureCode() const;
     
 public:
     static std::string getErrorString(eCMDERR code);

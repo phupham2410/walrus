@@ -38,6 +38,7 @@ HEADERS += \
     ../../src/api/StorageApiNvme.h \
     ../../src/api/StorageApiSata.h \
     ../../src/api/StorageApiScsi.h \
+    ../../src/api/StorageApiUsb.h \
     ../../src/cmn/AtaBase.h \
     ../../src/cmn/AtaCmd.h \
     ../../src/cmn/CmdBase.h \
