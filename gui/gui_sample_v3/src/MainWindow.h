@@ -44,6 +44,7 @@ public:
 
         QPushButton* DebugBtn;
         QPushButton* ReadBtn;
+        QPushButton* FillBtn;
     };
 
     sControl ctrl;
@@ -71,6 +72,7 @@ public:
 public slots:
     void handleDebug();
     void handleReadDrive();
+    void handleFillDrive();
 
     void handleStop();
     void handleViewDrive();

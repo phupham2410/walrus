@@ -1,4 +1,7 @@
 
+#ifndef StorageApiCmn_H
+#define StorageApiCmn_H
+
 #include <math.h>
 #include <time.h>
 #include <iomanip>
@@ -29,10 +32,6 @@ using namespace StorageApi;
 
 // ------------------------------------------------------------
 // Constants
-
-#define SMA_TEMPERATURE 194        // C2
-#define SMA_TOTAL_HOST_READ 242    // F2
-#define SMA_TOTAL_HOST_WRITTEN 241 // F1
 
 #define MASK16B 0xFFFF
 #define MASK32B 0xFFFFFFFF
@@ -334,31 +333,24 @@ STR StorageApi::ToString(const U8 *bufptr, U32 bufsize) {
     return HexFrmt::ToHexString(bufptr, bufsize);
 }
 
-// --------------------------------------------------------------------------------
-// Common static functions
-
-static bool GetSmartAttr(const tAttrMap& smap, U8 id, sSmartAttr& attr) {
-    tAttrConstIter iter = smap.find(id);
-    if (iter == smap.end()) return false;
-    attr = iter->second; return true;
+STR StorageApi::ToString(const sAdapterInfo &pi, U32 indent) {
+    std::stringstream sstr; STR prefix (indent, ' '); U32  sub = indent + 2;
+    #define MAP_ITEM(nlmid, nlend, text, val) do { \
+        sstr << prefix << text << ": "; \
+            if (nlmid) { sstr << ENDL; } sstr << val; if (nlend) { sstr << ENDL; }} while(0)
+        MAP_ITEM(0,1, "BusType"         , ToBusTypeString(pi.BusType));
+    MAP_ITEM(0,1, "MaxTransSector"  , pi.MaxTransferSector);
+    #undef MAP_ITEM
+    return sstr.str();
 }
 
-static bool GetSmartRaw(const tAttrMap& smap, U8 id, U32& lo, U32& hi) {
-    sSmartAttr attr;
-    if (!GetSmartAttr(smap, id, attr)) return false;
-    lo = attr.loraw; hi = attr.hiraw; return true;
-}
+#define SKIP_AND_CONTINUE(prog, weight) \
+    if (prog) { prog->progress += weight; continue; }
 
-static bool GetSmartValue(const tAttrMap& smap, U8 id, U8& val) {
-    sSmartAttr attr;
-    if (!GetSmartAttr(smap, id, attr)) return false;
-    val = attr.value; return true;
-}
+#define UPDATE_AND_RETURN_IF_STOP(p, w, func, param, ret) \
+    UPDATE_PROGRESS(p, w); FINALIZE_IF_STOP(p, func, param, ret)
 
-static bool SetSmartRaw(tAttrMap& smap, U8 id, U32 lo, U32 hi) {
-    tAttrIter iter = smap.find(id);
-    if (iter == smap.end()) return false;
-    sSmartAttr& attr = iter->second;
-    attr.loraw = lo; attr.hiraw = hi;
-    return true;
-}
+#define TRY_TO_EXECUTE_COMMAND(hdl, cmd) \
+    (cmd.executeCommand((int) hdl) && (CMD_ERROR_NONE == cmd.getErrorStatus()))
+
+#endif // StorageApiCmn_H

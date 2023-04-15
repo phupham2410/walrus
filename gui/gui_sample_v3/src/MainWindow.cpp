@@ -164,7 +164,8 @@ void MainWindow::enableGui(bool status) {
         ctrl.CloneBtn, ctrl.SetopBtn,
         ctrl.UpdateBtn,
 
-        ctrl.DebugBtn, ctrl.ReadBtn
+        ctrl.DebugBtn, ctrl.ReadBtn,
+        ctrl.FillBtn
     };
 
     QWidget* dis[] = {
@@ -289,6 +290,7 @@ void MainWindow::initWindow()
         b->addStretch();
         ADDBTN(ctrl.DebugBtn, "Debug", b, handleDebug, HIDEBTN);
         ADDBTN(ctrl.ReadBtn, "Test\nRead", b, handleReadDrive, SHOWBTN);
+        ADDBTN(ctrl.FillBtn, "Test\nFill", b, handleFillDrive, SHOWBTN);
         layout->addLayout(b);
     }
 
@@ -737,14 +739,13 @@ static bool GetNextPartition(STR& drvname, sPartition& p) {
 void ReadDriveThreadFunc(void* param) {
     DEF_APP_DATA(); (void) param;
 
-    // static uint64_t start = 267*1024*1024*2;
-
+    // Read some sectors at teh beginning of next partition
     uint64_t count = 128, start = 0;
-
-    // Read some sectors of next partition
     StorageApi::sPartition part;
     if (GetNextPartition(cmn.drvname, part))
         start = part.addr.first / 512;
+
+    start = (uint64_t) 100 * 1024 * 1024 * 1024 / 512;
 
     volatile StorageApi::sProgress* prog = &cmn.progress;
 
@@ -755,27 +756,29 @@ void ReadDriveThreadFunc(void* param) {
     StorageApi::HDL handle;
     StorageApi::eRetCode ret = StorageApi::Open(cmn.drvname, handle);
     if (ret != StorageApi::RET_OK) {
-        prog->rval = StorageApi::RET_NO_PERMISSION; prog->done = true; return;
+        prog->rval = StorageApi::RET_FAIL; prog->done = true; return;
     }
 
     StorageApi::sAdapterInfo adapter;
     ret = StorageApi::GetDeviceInfo(handle, adapter);
     if (ret != StorageApi::RET_OK) {
-        prog->rval = StorageApi::RET_NO_PERMISSION; prog->done = true; return;
+        prog->rval = StorageApi::RET_FAIL; prog->done = true; return;
     }
 
-    // uint32_t sc = adapter.MaxTransferSector;
-    uint32_t i, sc = 1, bufsize = SECTOR_SIZE * sc;
+    uint32_t sc = 1; // adapter.MaxTransferSector;
+    uint32_t i, bufsize = SECTOR_SIZE * sc;
     uint8_t* buffer = (uint8_t*) malloc(bufsize);
 
     if (!buffer) {
         prog->rval = StorageApi::RET_OUT_OF_MEMORY; prog->done = true; return;
     }
 
-    StartTimer();
+    memset(buffer, 0x00, bufsize);
 
-    uint64_t lba, end, fcnt = 0, tdiff, tsecs;
-    std::stringstream sstr, fstr, dstr;
+    uint64_t lba, end, fcnt = 0;
+    std::stringstream sstr, fstr, dstr; // main, fail and data stream
+
+    StartTimer();
 
     for (i = 0; i < count; i++) {
         if (prog->stop) {
@@ -783,10 +786,11 @@ void ReadDriveThreadFunc(void* param) {
         }
         // Read the next block
         lba = start + i * sc; end = lba + sc;
-        ret = StorageApi::Read(handle, lba, sc, buffer);
+        ret = StorageApi::Read(handle, lba, sc, buffer, adapter.BusType);
         if (ret != StorageApi::RET_OK) {
-            fcnt++; fstr << "Read Fail: "
-                         << "LBA(" << lba << ") Count(" << sc << ")" << std::endl;
+            fcnt++;
+            fstr << "Read Fail: "
+                 << "LBA(" << lba << ") Count(" << sc << ")" << std::endl;
         }
         else {
             dstr << "LBA: " << lba << std::endl
@@ -796,18 +800,23 @@ void ReadDriveThreadFunc(void* param) {
         prog->progress++;
     }
 
-    StopTimer(); tdiff = GetTimeDiff(); tsecs = end - start;
+    StopTimer();
+
+    uint64_t secs = end - start;
+    uint64_t tdiff = GetTimeDiff();
+
     sstr << "Reading drive " << cmn.drvname << ", "
          << "partition " << QString::fromStdWString(part.name).toStdString()
-         << "(" << part.index << ")" << std::endl
-         << "Range: start(" << start << ") -> end(" << end << ")" << std::endl
-         << "Total: " << tsecs << " sectors (" << tsecs * 512 << " bytes)" << std::endl
-         << "Command size: " << sc << " sectors" << std::endl;
+         << "(index " << part.index << ")" << std::endl
+         << "Range: start_lba(" << start << ") -> end_lba(" << end << "), "
+         << "total: " << secs << " sectors (" << secs * 512 << " bytes)" << std::endl
+         << "Transfer size per command: " << sc * 512 << " bytes" << std::endl;
 
     if (fcnt) sstr << fstr.str() << std::endl;
-    else sstr << "Speed: " << ToSpeedString(tsecs*512*1000, tdiff) << std::endl;
+    else sstr << "Speed: " << ToSpeedString(secs*512*1000, tdiff) << std::endl;
 
-    *(const_cast<std::string*>(&prog->info)) = sstr.str();
+    sstr << dstr.str();
+    *(const_cast<std::string*>(&prog->info)) += sstr.str();
 
     free(buffer);
     StorageApi::Close(handle);
@@ -833,6 +842,84 @@ void MainWindow::handleReadDrive()
     enableGui(false);
     cmn.initCommonParam(drv.name);
     startWorker(ReadDriveThreadFunc, &cmn);
+    waitProcessing(cmn.progress);
+
+    std::stringstream sstr;
+    std::string info = *const_cast<std::string*>(&cmn.progress.info);
+    sstr << "Debug Done! Return Code: "
+         << StorageApi::ToString(cmn.progress.rval) << std::endl
+         << "Report: " << std::endl << info;
+    setLog(QString(sstr.str().c_str()));
+    enableGui(true);
+}
+
+void FillDriveThreadFunc(void* param) {
+    DEF_APP_DATA(); (void) param;
+    std::stringstream sstr;
+
+    volatile StorageApi::sProgress* prog = &cmn.progress;
+    prog->progress = 0; prog->workload = 100; prog->ready = true;
+
+    // If filling on drive 0 --> skip it
+
+    sDriveInfo di;
+    if (!gData.getDriveInfo(cmn.drvname, di)) {
+        prog->rval = StorageApi::RET_FAIL; prog->done = true; return;
+    }
+
+    // --------------------------------------------------
+    // Step 1: Open device, get bustype & handle
+
+
+    // --------------------------------------------------
+    // Step 2: Read Capacity
+
+    uint64_t size_in_byte = di.id.cap * 1024 * 1024 * 1024;
+    uint64_t size_in_sector = size_in_byte / 512;
+
+    sstr << "Size in gb: " << di.id.cap << std::endl;
+    sstr << "Size in sector: " << size_in_sector << std::endl;
+    sstr << "Size in byte: " << size_in_byte << std::endl;
+    *(const_cast<std::string*>(&prog->info)) += sstr.str();
+
+    // --------------------------------------------------
+    // Step 3: Fill drive with pattern
+
+    uint32_t sc = 1;
+    uint8_t* buffer = (uint8_t*) malloc(sc * 512);
+    if (!buffer) {
+        prog->rval = StorageApi::RET_OUT_OF_MEMORY; prog->done = true; return;
+    }
+
+    for (uint64_t lba = 0; lba < size_in_sector; lba++) {
+        // eRetCode ret = StorageApi::Write(hdl, lba, sc, buffer, bustype);
+    }
+
+    // Open device
+    // Read capacity
+    // Fill drive with pattern
+    // Read each sector & check result
+    // Report
+
+    prog->rval = StorageApi::RET_NOT_IMPLEMENT; prog->done = true;
+}
+
+void MainWindow::handleFillDrive()
+{
+    DEF_APP_DATA();
+
+    int idx = ctrl.DrvList->currentRow();
+    int maxi = scan.darr.size();
+    RETURN_NO_DRIVE_FOUND_IF(!maxi);
+    RETURN_NO_SEL_DRIVE_IF(maxi && (idx < 0));
+    RETURN_WRONG_INDEX_IF((idx < 0) || (idx >= maxi));
+    const StorageApi::sDriveInfo& drv = scan.darr[idx];
+    RETURN_NOT_SUPPORT_IF(!drv.id.features.lbamode);
+    setLog("Fill drive with pattern " + QString(drv.name.c_str()));
+
+    enableGui(false);
+    cmn.initCommonParam(drv.name);
+    startWorker(FillDriveThreadFunc, &cmn);
     waitProcessing(cmn.progress);
 
     std::stringstream sstr;

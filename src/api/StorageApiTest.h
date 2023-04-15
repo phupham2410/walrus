@@ -141,6 +141,36 @@ static tDriveArray gDrvArr;
 // ------------------------------------------------------------
 // Static utilities
 
+// Similar to ApiUtil's
+static bool GetSmartAttr(const tAttrMap& smap, U8 id, sSmartAttr& attr) {
+    tAttrConstIter iter = smap.find(id);
+    if (iter == smap.end()) return false;
+    attr = iter->second; return true;
+}
+
+// Similar to ApiUtil's
+static bool GetSmartRaw(const tAttrMap& smap, U8 id, U32& lo, U32& hi) {
+    sSmartAttr attr;
+    if (!GetSmartAttr(smap, id, attr)) return false;
+    lo = attr.loraw; hi = attr.hiraw; return true;
+}
+
+// Similar to ApiUtil's
+static bool GetSmartValue(const tAttrMap& smap, U8 id, U8& val) {
+    sSmartAttr attr;
+    if (!GetSmartAttr(smap, id, attr)) return false;
+    val = attr.value; return true;
+}
+
+// Similar to ApiUtil's
+static bool SetSmartRaw(tAttrMap& smap, U8 id, U32 lo, U32 hi) {
+    tAttrIter iter = smap.find(id);
+    if (iter == smap.end()) return false;
+    sSmartAttr& attr = iter->second;
+    attr.loraw = lo; attr.hiraw = hi;
+    return true;
+}
+
 static bool RandomError(U32 erate)  {
     return (erate >= 100) ? true : ((U32)(rand() % 100) < erate);
 }
@@ -175,7 +205,7 @@ static std::string GenDriveName(U32 i) {
 
 #define SET_PARTITON(i, f, names, offset) do { \
     if (f < 0.01) break; \
-    sPartition p; p.index = i; p.name = names[i]; \
+    sPartition p; p.index = i; /* p.name = names[i]; */ \
     p.cap = cap * f; p.addr.second = p.cap * 1024 * 1024 * 2; \
     p.addr.first = offset; offset += p.addr.second; pi.parr.push_back(p); } while(0)
 
@@ -330,6 +360,34 @@ eRetCode StorageApi::CloneDrive(CSTR &dstdrv, CSTR &srcdrv, tConstAddrArray &par
     (void) dstdrv; (void) srcdrv; (void) parr;
     return ((ProcessTask(p, 2000) != RET_OK) ?
                 RET_ABORTED : (RANDERR09 ? RET_FAIL : RET_OK));
+}
+
+eRetCode StorageApi::Open(CSTR &drvname, HDL &handle) {
+    (void) handle; return RET_OK;
+}
+
+void StorageApi::Delay(U32 mlsec) {
+    Sleep(mlsec);
+}
+
+void StorageApi::Close(HDL handle) {
+    (void) handle;
+}
+
+eRetCode StorageApi::Write(HDL handle, U64 lba, U32 count, const U8 *buffer, volatile sProgress *p) {
+    (void) handle; (void) lba; (void) count; (void) buffer; (void) p;
+    return ((ProcessTask(p, 1) != RET_OK) ?
+                RET_ABORTED : (RANDERR09 ? RET_FAIL : RET_OK));
+}
+
+eRetCode StorageApi::Read(HDL handle, U64 lba, U32 count, U8 *buffer, U32 bustype, volatile sProgress *p) {
+    (void) handle; (void) lba; (void) count; (void) buffer; (void) bustype; (void) p;
+    return ((ProcessTask(p, 1) != RET_OK) ?
+                RET_ABORTED : (RANDERR09 ? RET_FAIL : RET_OK));
+}
+
+eRetCode StorageApi::GetDeviceInfo(HDL hdl, sAdapterInfo &info) {
+    (void) hdl; (void) info; return RET_OK;
 }
 
 // ------------------------------------------------------------

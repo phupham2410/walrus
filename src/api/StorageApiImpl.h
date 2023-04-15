@@ -6,8 +6,8 @@
 #include "winioctl.h"
 #include "ntddstor.h"
 
+#include "ApiUtil.h"
 #include "DeviceMgr.h"
-#include "AtaCmd.h"
 
 #include "StorageApiCmn.h"
 
@@ -16,12 +16,20 @@
 // Real implementation of StorageApi
 using namespace StorageApi;
 
+// Select function to run based on BusType
+#define SELFUNC_BY_BUSTYPE(_bt, _rv, _prefix, ...) do { switch(_bt) { \
+        case 0x07: _rv = _prefix##_UsbBus(__VA_ARGS__); break; \
+        case 0x0B: _rv = _prefix##_SataBus(__VA_ARGS__); break; \
+        case 0x11: _rv = _prefix##_NvmeBus(__VA_ARGS__); break; \
+    }} while(0)
+
 // Append log to volatile info
 #define PROGINFO(p) *const_cast<std::string*>(&p->info)
 static void AppendLog(volatile sProgress* p, CSTR& log) {
     if (p) PROGINFO(p) = PROGINFO(p) + "\n" + log;
 }
 
+// Dummy waiting function
 static eRetCode ProcessTask(volatile sProgress* p, U32 load, eRetCode ret) {
     INIT_PROGRESS(p, load); // Prepare progress
     for (U32 i = 0; i < load; i++) {
@@ -32,14 +40,6 @@ static eRetCode ProcessTask(volatile sProgress* p, U32 load, eRetCode ret) {
     FINALIZE_PROGRESS(p, ret);
     return p->rval;
 }
-
-#define SKIP_AND_CONTINUE(prog, weight) if (prog) { prog->progress += weight; continue; }
-
-#define UPDATE_AND_RETURN_IF_STOP(p, w, func, param, ret) \
-    UPDATE_PROGRESS(p, w); FINALIZE_IF_STOP(p, func, param, ret)
-
-#define TRY_TO_EXECUTE_COMMAND(hdl, cmd) \
-    (cmd.executeCommand((int) hdl) && (CMD_ERROR_NONE == cmd.getErrorStatus()))
 
 static void UpdateAdapterInfo(const sAdapterInfo& src, sDriveInfo& dst) {
     dst.bustype = src.BusType;
@@ -52,63 +52,13 @@ static void CloseDevice(sPHYDRVINFO& phy) {
 
 // Bus-Specific utilities
 #include "StorageApiScsi.h"
+#include "StorageApiUsb.h"
 #include "StorageApiSata.h"
 #include "StorageApiNvme.h"
-#include "StorageApiUsb.h"
 
 // --------------------------------------------------------------------------------
 
 
-#include "ScsiCmd.h"
-
-static eRetCode ScanDrive_UsbBus(sPHYDRVINFO& phy, U32 index, bool rsm, sDriveInfo& di, volatile sProgress *p) {
-    sDRVINFO drv;
-
-    do {
-        // --------------------------------------------------
-        // Read Identify data
-
-        // Scsi command with ATA code
-        ScsiCmd cmd; cmd.setCommand(0, 1, CMD_IDENTIFY_DEVICE);
-        if (!TRY_TO_EXECUTE_COMMAND(phy.DriveHandle, cmd)) SKIP_AND_CONTINUE(p,5)
-
-        DeviceMgr::ParseIdentifyInfo(cmd.getBufferPtr(), phy.DriveName, drv.IdentifyInfo);
-        drv.IdentifyInfo.DriveIndex = index;
-        UPDATE_AND_RETURN_IF_STOP(p, 1, CloseDevice, phy, RET_ABORTED);
-
-        // --------------------------------------------------
-        // Testing for skipped drives
-
-        // --------------------------------------------------
-        // Testing for skipped drives
-
-        // --------------------------------------------------
-        // Read SMART data
-        if (!rsm) UPDATE_PROGRESS(p, 4);
-        else
-        {
-            U8 vbuf[SECTOR_SIZE]; U8 tbuf[SECTOR_SIZE];
-            cmd.setCommand(0, 1, CMD_SMART_READ_DATA);
-            if (!TRY_TO_EXECUTE_COMMAND(phy.DriveHandle, cmd)) SKIP_AND_CONTINUE(p,4)
-            memcpy(vbuf, cmd.getBufferPtr(), cmd.SecCount * SECTOR_SIZE);
-            UPDATE_AND_RETURN_IF_STOP(p, 1, CloseDevice, phy, RET_ABORTED);
-
-            cmd.setCommand(0, 1, CMD_SMART_READ_THRESHOLD);
-            if (!TRY_TO_EXECUTE_COMMAND(phy.DriveHandle, cmd)) SKIP_AND_CONTINUE(p,3)
-            memcpy(tbuf, cmd.getBufferPtr(), cmd.SecCount * SECTOR_SIZE);
-            UPDATE_AND_RETURN_IF_STOP(p, 1, CloseDevice, phy, RET_ABORTED);
-
-            DeviceMgr::ParseSmartData(vbuf, tbuf, drv.SmartInfo);
-            UPDATE_AND_RETURN_IF_STOP(p, 1, CloseDevice, phy, RET_ABORTED);
-        }
-
-        NsSata::UpdateDriveInfo(drv, di);
-
-        return RET_OK;
-    } while(0);
-
-    return RET_FAIL;
-}
 
 
 // --------------------------------------------------------------------------------
@@ -144,18 +94,7 @@ eRetCode StorageApi::ScanDrive(tDriveArray &darr, bool rid, bool rsm, volatile s
         lstr << "BusType: " << adapter.BusType; AppendLog(p, lstr.str());
 
         eRetCode ret; sDriveInfo di;
-        switch(adapter.BusType) {
-            case 0x07: // 0x07: BusTypeUsb
-                ret = ScanDrive_UsbBus(phy, i, rsm, di, p); break;
-
-            case 0x0B: // 0x0B: BusTypeSata
-                ret = ScanDrive_SataBus(phy, i, rsm, di, p); break;
-
-            case 0x11: // 0x0B: BusTypeNvme
-                ret = ScanDrive_NvmeBus(phy, i, rsm, di, p); break;
-
-            default: ret = RET_NOT_SUPPORT; break;
-        }
+        SELFUNC_BY_BUSTYPE(adapter.BusType, ret, ScanDrive, phy, i, rsm, di, p);
 
         if (ret != RET_OK) SKIP_AND_CONTINUE(p,1)
 
@@ -163,18 +102,14 @@ eRetCode StorageApi::ScanDrive(tDriveArray &darr, bool rid, bool rsm, volatile s
         // accept drive
 
         UpdateAdapterInfo(adapter, di);
-        ret = ScanPartition(phy.DriveHandle, di.pi);
-        if (ret != RET_OK) {
-            std::stringstream sstr;
-                sstr << "Cannot read partition info; ret=" << std::hex << ret;
-            AppendLog(p, sstr.str());
-        }
+        ScanPartition(phy.DriveHandle, di.pi);
         UPDATE_PROGRESS(p, 1);
 
         darr.push_back(di); DeviceMgr::CloseDevice(phy);
     }
 
-    if (!darr.size()) rc = (vldcnt != 0) ? RET_SKIP_DRIVE : RET_NO_PERMISSION;
+    if (!darr.size())
+        rc = (vldcnt != 0) ? RET_SKIP_DRIVE : RET_NO_PERMISSION;
 
     FINALIZE_PROGRESS(p, rc); return rc;
 }
@@ -256,28 +191,10 @@ eRetCode StorageApi::Write(HDL handle, U64 lba, U32 count, const U8 *buffer, vol
     return ProcessTask(p, 2, RET_NOT_IMPLEMENT);
 }
 
-eRetCode StorageApi::Read(HDL handle, U64 lba, U32 count, U8 *buffer, volatile sProgress *p) {
-    (void) p;
-
-    U64 bufsize = count * SECTOR_SIZE;
-    AtaCmd cmd; cmd.setCommand(lba, count, CMD_READ_DMA_48B);
-    if (!TRY_TO_EXECUTE_COMMAND(handle, cmd)) {
-        memset(buffer, 0x00, bufsize); return RET_FAIL;
-    }
-
-    memcpy(buffer, cmd.getBufferPtr(), cmd.SecCount * SECTOR_SIZE);
-    return RET_OK;
-}
-
-STR StorageApi::ToString(const sAdapterInfo &pi, U32 indent) {
-    std::stringstream sstr; STR prefix (indent, ' '); U32  sub = indent + 2;
-    #define MAP_ITEM(nlmid, nlend, text, val) do { \
-        sstr << prefix << text << ": "; \
-        if (nlmid) { sstr << ENDL; } sstr << val; if (nlend) { sstr << ENDL; }} while(0)
-    MAP_ITEM(0,1, "BusType"         , ToBusTypeString(pi.BusType));
-    MAP_ITEM(0,1, "MaxTransSector"  , pi.MaxTransferSector);
-    #undef MAP_ITEM
-    return sstr.str();
+eRetCode StorageApi::Read(HDL handle, U64 lba, U32 count, U8 *buffer, U32 bustype, volatile sProgress *p) {
+    eRetCode ret;
+    SELFUNC_BY_BUSTYPE(bustype, ret, Read, handle, lba, count, buffer, p);
+    return ret;
 }
 
 eRetCode StorageApi::GetDeviceInfo(HDL hdl, sAdapterInfo &info) {

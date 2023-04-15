@@ -124,6 +124,41 @@ string CmdBase::getErrorString(eCMDERR code)
     return errorString;
 }
 
+eCMDERR CmdBase::ParseSense(U8* sense)
+{
+    U8 responseCode = sense[0] & 0x7F;
+
+    if (0 == responseCode) return CMD_ERROR_NONE;
+
+    U8 senseKey = sense[2] & 0x0F;
+
+    if (senseKey == 0) return CMD_ERROR_NONE;
+
+    U8 senseCode = sense[12];
+    U8 senseQualifier = sense[13];
+
+    // Interpret value of senseCode and senseCodeQualifier
+    // Temporary return ERROR_UNKN here
+
+    (void) senseCode;
+    (void) senseQualifier;
+
+    return CMD_ERROR_UNKN;
+}
+
+eCMDERR CmdBase::ParseSATSense(U8* sense)
+{
+    U8 resCode = sense[0];
+
+    if ((resCode < 0x72) || (resCode > 0x73)) return CMD_ERROR_NONE;
+
+    if ((sense[8] != 0x09) || (sense[9] != 0x0C)) return CMD_ERROR_UNKN;
+
+    if (0 != (sense[21] & 0x01)) return CMD_ERROR_ABORT;
+
+    return CMD_ERROR_NONE;
+}
+
 void CmdBase::formatAddress(U32 writeCount)
 {
     U32 lbaAddress = LBA.lo;

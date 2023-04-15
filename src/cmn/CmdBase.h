@@ -88,6 +88,8 @@ public:
     
 public:
     static std::string getErrorString(eCMDERR code);
+    static eCMDERR ParseSense(U8* sense);
+    static eCMDERR ParseSATSense(U8* sense);
 };
 
 #endif // CMDBASE_H

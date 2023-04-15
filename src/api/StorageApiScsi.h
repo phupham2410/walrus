@@ -1,9 +1,15 @@
+#ifndef StorageApiScsi_H
+#define StorageApiScsi_H
 
-static eRetCode ScanDrive_ScsiBus(sPHYDRVINFO& phy, U32 index, bool rsm, sDriveInfo& di, volatile sProgress *p) {
-    std::stringstream sstr;
-    sstr << "Scanning device " << index << " on ScsiBus";
-    AppendLog(p, sstr.str());
+#include "ApiUtil.h"
+#include "ScsiCmd.h"
+#include "DeviceMgr.h"
+#include "StorageApiCmn.h"
 
-    UPDATE_PROGRESS(p, 6);
-    return RET_NOT_SUPPORT;
-}
+
+
+
+
+
+
+#endif // StorageApiScsi_H

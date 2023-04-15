@@ -48,7 +48,8 @@ bool ScsiCmd::buildCommand()
 
 eCMDERR ScsiCmd::getErrorStatus()
 {
-    return CMD_ERROR_NONE;
+    SYSTEM_DATA& p = *(SYSTEM_DATA*)(void*)getStructPtr();
+    return IsSat ? CmdBase::ParseSATSense(p.Sense) : CmdBase::ParseSense(p.Sense);
 }
 
 void ScsiCmd::setCommand(sADDRESS lba, U32 sectorCount, eSCSICODE cmdCode)

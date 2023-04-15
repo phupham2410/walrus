@@ -8,3 +8,4 @@ MAP_ITEM(CMD_ERROR_ABORT) // Abort
 MAP_ITEM(CMD_ERROR_IDNF ) // ID Not Found
 MAP_ITEM(CMD_ERROR_UNC  ) // Uncorrectable Error
 MAP_ITEM(CMD_ERROR_ICRC ) // Interface CRC
+MAP_ITEM(CMD_ERROR_UNKN ) // Unknown error

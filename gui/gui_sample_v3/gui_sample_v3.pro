@@ -10,6 +10,7 @@ greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
 TARGET = gui_sample_v3
 TEMPLATE = app
+#DEFINES += STORAGE_API_TEST
 DEFINES += STORAGE_API_IMPL
 
 INCLUDEPATH += ./src

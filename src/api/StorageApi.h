@@ -250,7 +250,7 @@ namespace StorageApi {
     void Delay(U32 mlsec);
     void Close(HDL handle);
     eRetCode Open(CSTR& drvname, HDL& handle);
-    eRetCode Read(HDL handle, U64 lba, U32 count, U8* buffer, volatile sProgress* p = NULL);
+    eRetCode Read(HDL handle, U64 lba, U32 count, U8* buffer, U32 bustype, volatile sProgress* p = NULL);
     eRetCode Write(HDL handle, U64 lba, U32 count, const U8* buffer, volatile sProgress* p = NULL);
 
     // Handle misc request
