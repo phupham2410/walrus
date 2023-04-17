@@ -20,6 +20,7 @@ SOURCES += \
     ../../src/cmn/HexFrmt.cpp \
     ../../src/cmn/ScsiBase.cpp \
     ../../src/cmn/ScsiCmd.cpp \
+    ../../src/cmn/NvmeUtil.cpp \
     ../../src/cmn/StringUtil.cpp \
     ../../src/cmn/SystemUtil.cpp \
     ../../src/api/StorageApi.cpp
@@ -50,6 +51,7 @@ HEADERS += \
     ../../src/cmn/DeviceUtil.h \
     ../../src/cmn/ScsiBase.h \
     ../../src/cmn/ScsiCmd.h \
+    ../../src/cmn/NvmeUtil.h \
     ../../src/cmn/StdHeader.h \
     ../../src/cmn/StdMacro.h \
     ../../src/cmn/StringUtil.h \
