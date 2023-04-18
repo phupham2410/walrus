@@ -285,3 +285,87 @@ exit:
 
     return result;
 }
+
+BOOL NvmeUtil::GetSelfTestLog(HANDLE hDevice, PNVME_DEVICE_SELF_TEST_LOG pSelfTestLog) {
+    BOOL    result = FALSE;
+    PVOID   buffer = NULL;
+    ULONG   bufferLength = 0;
+    ULONG   returnedLength = 0;
+
+    PSTORAGE_PROPERTY_QUERY query = NULL;
+    PSTORAGE_PROTOCOL_SPECIFIC_DATA protocolData = NULL;
+    PSTORAGE_PROTOCOL_DATA_DESCRIPTOR protocolDataDescr = NULL;
+
+    if (NULL == pSelfTestLog) {
+        printf("GetSelfTestLog: invalid input.\n");
+        goto exit;
+    }
+
+    // Allocate buffer for use.
+    bufferLength = offsetof(STORAGE_PROPERTY_QUERY, AdditionalParameters)
+        + sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA)
+        + sizeof(NVME_DEVICE_SELF_TEST_LOG);
+    buffer = malloc(bufferLength);
+
+    if (buffer == NULL) {
+        printf("GetSelfTestLog: allocate buffer failed.\n");
+        goto exit;
+    }
+
+    ZeroMemory(buffer, bufferLength);
+
+    query = (PSTORAGE_PROPERTY_QUERY)buffer;
+    protocolDataDescr = (PSTORAGE_PROTOCOL_DATA_DESCRIPTOR)buffer;
+    protocolData = (PSTORAGE_PROTOCOL_SPECIFIC_DATA)query->AdditionalParameters;
+
+    query->PropertyId = StorageDeviceProtocolSpecificProperty;
+    query->QueryType = PropertyStandardQuery;
+
+    protocolData->ProtocolType = ProtocolTypeNvme;
+    protocolData->DataType = NVMeDataTypeLogPage;
+    protocolData->ProtocolDataRequestValue = NVME_LOG_PAGE_DEVICE_SELF_TEST;
+    protocolData->ProtocolDataRequestSubValue = NVME_NAMESPACE_ALL;
+    protocolData->ProtocolDataOffset = sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA);
+    protocolData->ProtocolDataLength = sizeof(NVME_DEVICE_SELF_TEST_LOG);
+
+    // Send request down.  
+    result = DeviceIoControl(hDevice,
+        IOCTL_STORAGE_QUERY_PROPERTY,
+        buffer,
+        bufferLength,
+        buffer,
+        bufferLength,
+        &returnedLength,
+        NULL
+    );
+
+    if (!result) goto exit;
+
+    // Validate the returned data.
+    if ((protocolDataDescr->Version != sizeof(STORAGE_PROTOCOL_DATA_DESCRIPTOR)) ||
+        (protocolDataDescr->Size != sizeof(STORAGE_PROTOCOL_DATA_DESCRIPTOR))) {
+        printf("GetSelfTestLog: Data Descriptor Header is not valid.\n");
+        result = FALSE;
+        goto exit;
+    }
+
+    protocolData = &protocolDataDescr->ProtocolSpecificData;
+
+    if ((protocolData->ProtocolDataOffset < sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA)) ||
+        (protocolData->ProtocolDataLength < sizeof(NVME_DEVICE_SELF_TEST_LOG))) {
+        printf("GetSelfTestLog: ProtocolData Offset/Length is not valid.\n");
+        result = FALSE;
+        goto exit;
+    }
+
+    memcpy(pSelfTestLog, (PCHAR)protocolData + protocolData->ProtocolDataOffset, sizeof(NVME_DEVICE_SELF_TEST_LOG));
+
+    result = TRUE;
+exit:
+    if (buffer != NULL)
+    {
+        free(buffer);
+    }
+
+    return result;
+}

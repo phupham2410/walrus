@@ -7,7 +7,7 @@
 
 
 int main(int argc, char** argv) {
-    int iHandle;
+    tHdl iHandle;
     HANDLE hHandle;
     bool status;
 
@@ -78,6 +78,17 @@ int main(int argc, char** argv) {
     else {
         std::cout << "Failure to read health log" << std::endl;
     }
+
+    std::cout << "\n-----Get selftest log:------\n";
+    NVME_DEVICE_SELF_TEST_LOG selfTestLog;
+    if(NvmeUtil::GetSelfTestLog(hHandle, &selfTestLog)) {
+        std::cout << "CurrentOperation.Status: " << (unsigned int)selfTestLog.CurrentOperation.Status << std::endl;
+        std::cout << "Newest.Result[0].Status.Result: " << (unsigned int)selfTestLog.ResultData[0].Status.Result << std::endl;
+         std::cout << "Newest.Result[0].Status.CodeValue: " << (unsigned int)selfTestLog.ResultData[0].Status.CodeValue << std::endl;
+    } else {
+        std::cout << "Failure to read selftest log" << std::endl;
+    }
+
 
     if (hHandle != INVALID_HANDLE_VALUE) {
         DeviceMgr::CloseDevice(iHandle);
