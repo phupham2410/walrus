@@ -120,11 +120,13 @@ eRetCode StorageApi::ScanPartition(CSTR &drvname, sPartInfo &pinf) {
     return ScanPartition(hdl, pinf);
 }
 
-eRetCode StorageApi::ScanPartition(HDL handle, sPartInfo &parr) {
-    parr.parr.clear();
-    const uint32_t bufsize = 1024; uint8_t buffer[bufsize]; DWORD retcnt;
+eRetCode StorageApi::ScanPartition(HDL handle, sPartInfo &pinf) {
+    pinf.parr.clear();
+    const uint32_t bufsize = 8192; uint8_t buffer[bufsize]; DWORD retcnt;
     if (!DeviceIoControl(*(HANDLE*) &handle, IOCTL_DISK_GET_DRIVE_LAYOUT_EX,
-             NULL, 0, buffer, bufsize, &retcnt, NULL)) return RET_NO_PERMISSION;
+             NULL, 0, buffer, bufsize, &retcnt, NULL)) return RET_NOT_SUPPORT;
+
+    if (!retcnt) return RET_EMPTY;
 
     DRIVE_LAYOUT_INFORMATION_EX* layout = (DRIVE_LAYOUT_INFORMATION_EX*)buffer;
     for (int i = 0, maxi = layout->PartitionCount; i < maxi; i++) {
@@ -136,10 +138,10 @@ eRetCode StorageApi::ScanPartition(HDL handle, sPartInfo &parr) {
         part.addr.second = item.PartitionLength.QuadPart; // byte unit
         part.cap = ((part.addr.second * 100) >> 30) / 100.0;
         part.name = (item.PartitionStyle == 1) ? item.Gpt.Name : L"Unknown Name";
-        parr.parr.push_back(part);
+        pinf.parr.push_back(part);
     }
 
-    return parr.parr.size() ? RET_OK : RET_NOT_FOUND;
+    return pinf.parr.size() ? RET_OK : RET_NOT_FOUND;
 }
 
 eRetCode StorageApi::UpdateFirmware(CSTR& drvname, const U8* bufptr, U32 bufsize, volatile sProgress *p) {

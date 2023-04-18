@@ -27,7 +27,7 @@ enum eSECSTATE
 struct sPHYDRVINFO
 {
     int DriveNumber;
-    int DriveHandle;
+    tHdl DriveHandle;
     std::string DriveName;
 };
 
@@ -39,8 +39,8 @@ class DeviceMgr
 // Porting to each OS
 // -------------------------------------------------------------
 public:
-    static bool OpenDevice(const std::string& deviceName, int& handle);
-    static void CloseDevice(int handle);
+    static bool OpenDevice(const std::string& deviceName, tHdl& handle);
+    static void CloseDevice(tHdl handle);
     static bool OpenDevice(U32 idx, sPHYDRVINFO& drive);
     static void OpenDevice(tPHYDRVARRAY& driveList);
     static void CloseDevice(sPHYDRVINFO& drive);

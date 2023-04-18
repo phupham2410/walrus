@@ -78,7 +78,7 @@ eSCANERROR DeviceMgr::ScanDriveCommon(list<sDRVINFO>& infoList, bool readSMART, 
 
 bool DeviceMgr::ReadIdentifyDataCommon(const string &deviceName, U8 *identifyBuffer)
 {
-    int handle;
+    tHdl handle;
     AtaCmd cmd;
     bool status = false;
 

@@ -77,7 +77,7 @@ void ScsiCmd::setCommand(sADDRESS lba, U32 sectorCount, U32 cmdCode, bool isSat)
     buildCommand();
 }
 
-bool ScsiCmd::executeCommand(int handle)
+bool ScsiCmd::executeCommand(tHdl handle)
 {
     HANDLE deviceHandle = (HANDLE) handle; // In Windows, HANDLE == pvoid
 

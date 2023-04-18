@@ -16,7 +16,7 @@ namespace StorageApi {
     typedef int S32;
     typedef long long S64;
 
-    typedef int HDL;
+    typedef long long HDL;
     typedef std::string STR;
     typedef const STR CSTR;
     typedef std::wstring WSTR;

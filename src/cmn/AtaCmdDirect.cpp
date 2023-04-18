@@ -93,7 +93,7 @@ void AtaCmdDirect::setCommand(sADDRESS lba, U32 sectorCount, eATACODE cmdCode)
     buildCommand();
 }
 
-bool AtaCmdDirect::executeCommand(int handle)
+bool AtaCmdDirect::executeCommand(tHdl handle)
 {
     HANDLE deviceHandle = (HANDLE) handle; // In Windows, HANDLE == pvoid
 

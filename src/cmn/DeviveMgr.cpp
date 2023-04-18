@@ -6,7 +6,7 @@
 using namespace std;
 
 
-bool DeviceMgr::OpenDevice(const string &deviceName, int &handle)
+bool DeviceMgr::OpenDevice(const string &deviceName, tHdl &handle)
 {
     HANDLE handlePtr = CreateFileA(
         deviceName.c_str(),
@@ -20,7 +20,7 @@ bool DeviceMgr::OpenDevice(const string &deviceName, int &handle)
 
     if (handlePtr == INVALID_HANDLE_VALUE) return false;
 
-    handle = (int)(reinterpret_cast<U64>(handlePtr));
+    handle = (tHdl)(reinterpret_cast<U64>(handlePtr));
     return true;
 }
 
@@ -30,14 +30,14 @@ bool DeviceMgr::OpenDevice(U32 idx, sPHYDRVINFO& drive)
     sstr << "\\\\.\\PhysicalDrive" << idx;
     string driveName = sstr.str();
 
-    int handle;
+    tHdl handle;
     bool rc = OpenDevice(driveName, handle);
 
     if (rc)
     {
         drive.DriveNumber = idx;
         drive.DriveName = driveName;
-        drive.DriveHandle = (int) handle;
+        drive.DriveHandle = (tHdl) handle;
     }
 
     return rc;
@@ -60,7 +60,7 @@ void DeviceMgr::OpenDevice(tPHYDRVARRAY& driveList)
     }
 }
 
-void DeviceMgr::CloseDevice(int handle)
+void DeviceMgr::CloseDevice(tHdl handle)
 {
     CloseHandle((HANDLE) handle);
 }

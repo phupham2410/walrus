@@ -7,7 +7,7 @@
 class ScsiCmd : public ScsiBase
 {
 public:
-    bool executeCommand(int handle);
+    bool executeCommand(tHdl handle);
     void setCommand(sADDRESS lba, U32 sectorCount, eATACODE cmdCode);
     void setCommand(sADDRESS lba, U32 sectorCount, eSCSICODE cmdCode);
 

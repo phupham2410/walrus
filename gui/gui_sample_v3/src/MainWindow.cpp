@@ -8,6 +8,7 @@
 // ----------------------------------------------------------------------------
 // Data structure to control StorageAPI
 
+using namespace std;
 using namespace StorageApi;
 
 #define DEF_APP_DATA() \
@@ -288,7 +289,7 @@ void MainWindow::initWindow()
         ADDBTN(ctrl.TestBtn, "Self\nTest", b, handleSelfTest, HIDEBTN);
         ADDBTN(ctrl.UpdateBtn, "Update\nFirmware", b, handleUpdateFirmware, HIDEBTN);
         b->addStretch();
-        ADDBTN(ctrl.DebugBtn, "Debug", b, handleDebug, HIDEBTN);
+        ADDBTN(ctrl.DebugBtn, "Debug", b, handleDebug, SHOWBTN);
         ADDBTN(ctrl.ReadBtn, "Test\nRead", b, handleReadDrive, SHOWBTN);
         ADDBTN(ctrl.FillBtn, "Test\nFill", b, handleFillDrive, SHOWBTN);
         layout->addLayout(b);
@@ -688,10 +689,29 @@ void MainWindow::handleDebug()
     // scan.progress.reset();
     // appendLog("Debug Done!");
 
-    StorageApi::HDL hdl;
-    if (StorageApi::RET_OK != StorageApi::Open("\\\\.\\PhysicalDrive0", hdl)) {
-        appendLog("Cannot open device"); return;
+    // StorageApi::HDL hdl;
+    // if (StorageApi::RET_OK != StorageApi::Open("\\\\.\\PhysicalDrive0", hdl)) {
+    //     appendLog("Cannot open device"); return;
+    // }
+
+    // Try to read partition info on all drives
+    std::stringstream sstr;
+
+    for (uint32_t i = 0; i < 16; i++) {
+        std::stringstream nstr;
+        nstr << "\\\\.\\PhysicalDrive" << i;
+        std::string drvname = nstr.str();
+
+
+        StorageApi::sPartInfo pi;
+        StorageApi::eRetCode ret = StorageApi::ScanPartition(drvname, pi);
+        if (ret != StorageApi::RET_OK) continue;
+
+        sstr << "Scan partitions on drive " << drvname << std::endl;
+        sstr << StorageApi::ToString(pi) << std::endl;
     }
+
+    setLog(sstr.str().c_str());
 }
 
 // ----------------------------------------------------------------------------

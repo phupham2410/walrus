@@ -6,7 +6,7 @@
 class AtaCmd : public AtaBase
 {
 public:
-    bool executeCommand(int handle);
+    bool executeCommand(tHdl handle);
     void setCommand(sADDRESS lba, U32 sectorCount, eATACODE cmdCode);
 
 public:
@@ -20,7 +20,7 @@ private:
 class AtaCmdExt : public AtaBase
 {
 public:
-    bool executeCommand(int handle);
+    bool executeCommand(tHdl handle);
     void setCommand(sADDRESS lba, U32 sectorCount, eATACODE cmdCode);
 
 public:
@@ -34,7 +34,7 @@ private:
 class AtaCmdDirect : public AtaBase
 {
 public:
-    bool executeCommand(int handle);
+    bool executeCommand(tHdl handle);
     void setCommand(sADDRESS lba, U32 sectorCount, eATACODE cmdCode);
 
 public:
@@ -48,7 +48,7 @@ private:
 class AtaCmdScsi : public AtaBase
 {
 public:
-    bool executeCommand(int handle);
+    bool executeCommand(tHdl handle);
     void setCommand(sADDRESS lba, U32 sectorCount, eATACODE cmdCode);
 
 public:
