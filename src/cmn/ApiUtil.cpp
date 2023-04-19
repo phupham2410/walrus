@@ -60,12 +60,23 @@ bool ApiUtil::GetSmartValue(const tAttrMap& smap, U8 id, U8& val) {
     val = attr.value; return true;
 }
 
-bool ApiUtil::SetSmartRaw(tAttrMap& smap, U8 id, U32 lo, U32 hi) {
+sSmartAttr& ApiUtil::GetSmartAttrRef(tAttrMap& smap, U8 id) {
     tAttrIter iter = smap.find(id);
-    if (iter == smap.end()) return false;
-    sSmartAttr& attr = iter->second;
-    attr.loraw = lo; attr.hiraw = hi;
-    return true;
+    if (iter == smap.end()) {
+        smap[id] = sSmartAttr();
+        iter = smap.find(id);
+    }
+    return iter->second;
+}
+
+bool ApiUtil::SetSmartRaw(tAttrMap& smap, U8 id, U32 lo, U32 hi) {
+    sSmartAttr& attr = GetSmartAttrRef(smap, id);
+    attr.loraw = lo; attr.hiraw = hi; return true;
+}
+
+bool ApiUtil::SetSmartRaw(tAttrMap& smap, U8 id, U32 lo, U32 hi, U32 thr) {
+    sSmartAttr& attr = GetSmartAttrRef(smap, id);
+    attr.loraw = lo; attr.hiraw = hi; attr.threshold = thr; return true;
 }
 
 void ApiUtil::UpdateDriveInfo(const sDRVINFO& src, sDriveInfo& dst) {
@@ -88,15 +99,15 @@ void ApiUtil::UpdateDriveInfo(const sDRVINFO& src, sDriveInfo& dst) {
     if (1) {
         // Others
         sSmartAttr attr;
-        if (ApiUtil::GetSmartAttr(dst.si.amap, SMA_TEMPERATURE, attr)) {
+        if (ApiUtil::GetSmartAttr(dst.si.amap, SMA_TEMPERATURE_CELSIUS, attr)) {
             dst.temp = ((U64)attr.hiraw << 32) | attr.loraw;
         }
 
-        if (ApiUtil::GetSmartAttr(dst.si.amap, SMA_TOTAL_HOST_READ, attr)) {
+        if (ApiUtil::GetSmartAttr(dst.si.amap, SMA_TOTAL_LBA_READ, attr)) {
             dst.tread = ((U64)attr.hiraw << 32) | attr.loraw;
         }
 
-        if (ApiUtil::GetSmartAttr(dst.si.amap, SMA_TOTAL_HOST_WRITTEN, attr)) {
+        if (ApiUtil::GetSmartAttr(dst.si.amap, SMA_TOTAL_LBA_WRITTEN, attr)) {
             dst.twrtn = ((U64)attr.hiraw << 32) | attr.loraw;
         }
     }

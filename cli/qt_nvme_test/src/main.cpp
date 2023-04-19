@@ -2,12 +2,12 @@
 #include "DeviceMgr.h"
 #include "NvmeUtil.h"
 
-#define DRIVENAME "\\\\.\\PhysicalDrive1"
+#define DRIVENAME "\\\\.\\PhysicalDrive0"
 #include<iostream>
 
 
 int main(int argc, char** argv) {
-    int iHandle;
+    tHdl iHandle;
     HANDLE hHandle;
     bool status;
 
@@ -65,11 +65,11 @@ int main(int argc, char** argv) {
     std::cout << "\n-----Get Health Info:------\n";
     NVME_HEALTH_INFO_LOG healthInfoLog;
     if (NvmeUtil::GetSMARTHealthInfoLog(hHandle, &healthInfoLog)) {
-        std::cout << "CriticalWarning.AvailableSpaceLow: " << healthInfoLog.CriticalWarning.AvailableSpaceLow << std::endl;
-        std::cout << "CriticalWarning.TemperatureThreshold: " << healthInfoLog.CriticalWarning.TemperatureThreshold << std::endl;
-        std::cout << "CriticalWarning.ReliabilityDegraded: " << healthInfoLog.CriticalWarning.ReliabilityDegraded << std::endl;
-        std::cout << "CriticalWarning.ReadOnly: " << healthInfoLog.CriticalWarning.ReadOnly << std::endl;
-        std::cout << "CriticalWarning.VolatileMemoryBackupDeviceFailed: " << healthInfoLog.CriticalWarning.VolatileMemoryBackupDeviceFailed << std::endl;
+        std::cout << "CriticalWarning.AvailableSpaceLow: " << (uint32_t) healthInfoLog.CriticalWarning.AvailableSpaceLow << std::endl;
+        std::cout << "CriticalWarning.TemperatureThreshold: " << (uint32_t) healthInfoLog.CriticalWarning.TemperatureThreshold << std::endl;
+        std::cout << "CriticalWarning.ReliabilityDegraded: " << (uint32_t) healthInfoLog.CriticalWarning.ReliabilityDegraded << std::endl;
+        std::cout << "CriticalWarning.ReadOnly: " << (uint32_t) healthInfoLog.CriticalWarning.ReadOnly << std::endl;
+        std::cout << "CriticalWarning.VolatileMemoryBackupDeviceFailed: " << (uint32_t) healthInfoLog.CriticalWarning.VolatileMemoryBackupDeviceFailed << std::endl;
 
         std::cout << "AvailableSpare(%): " << (unsigned int)healthInfoLog.AvailableSpare << std::endl;
         std::cout << "AvailableSpareThreshold(%): " << (unsigned int)healthInfoLog.AvailableSpareThreshold << std::endl;
@@ -84,5 +84,6 @@ int main(int argc, char** argv) {
     }
     return 0;
 exit_error:
+    std::cout << "Error exit" << std::endl;
     return -1;
 }

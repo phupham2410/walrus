@@ -27,6 +27,13 @@ enum eIDENTKEY
     #undef MAP_ITEM
 };
 
+enum eSMARTKEY
+{
+    #define MAP_ITEM(code, val, show, name, note) code = val,
+    #include "AttrName.def"
+    #undef MAP_ITEM
+};
+
 class cCoreUtil
 {
 public:    

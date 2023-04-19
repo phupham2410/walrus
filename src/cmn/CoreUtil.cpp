@@ -8,7 +8,7 @@ void cCoreUtil::sUtilData::InitAttrNameMap()
     // Init AttributeName map
     typedef pair<U8, sATTRPARAM> tItemInfo;
     tItemInfo itemArray[] = {
-        #define MAP_ITEM(code, show, name, note) tItemInfo(code, sATTRPARAM(name, note, show)),
+        #define MAP_ITEM(code, val, show, name, note) tItemInfo(val, sATTRPARAM(name, note, show)),
         #include "AttrName.def"
         #undef MAP_ITEM
     };

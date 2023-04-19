@@ -1,25 +1,43 @@
-MAP_ITEM(1  ,  true, "Raw_Read_Error_Rate"         ,"Reset at Power On")
-MAP_ITEM(5  , false, "Reallocated_Sector_Ct"       ,"")
-MAP_ITEM(9  ,  true, "Power_On_Hours"              ,"Reset at Power On")
-MAP_ITEM(12 ,  true, "Power_Cycle_Count"           ,"Life Cumulative")  // 0C
-MAP_ITEM(192,  true, "Sudden_Power_Lost_Count"     ,"Life Cumulative")  // C0
-MAP_ITEM(194,  true, "Temperature_Celsius"         ,"")  // C2
-MAP_ITEM(195, false, "Hardware_ECC_Recovered"      ,"")  // C3
-MAP_ITEM(196,  true, "Reallocated_Event_Count"     ,"")  // C4
-MAP_ITEM(197,  true, "Current_Pending_Sector_Count","")  //C5
-MAP_ITEM(198, false, "Offline_Uncorrectable"       ,"")  // C6
-MAP_ITEM(199,  true, "UDMA_CRC_Error_Count"        ,"Life Cumulative")  // C7
-MAP_ITEM(241,  true, "Total_LBAs_Written"          ,"Life Cumulative")  // F1
-MAP_ITEM(242,  true, "Total_LBAs_Read"             ,"Life Cumulative")  // F2
-MAP_ITEM(248,  true, "Remaining_Life_Left"         ,"Life Cumulative")  // F8
-MAP_ITEM(249,  true, "Remaining_Spare_Block_Count" ,"Life Cumulative")  // F9
-MAP_ITEM(160,  true, "Uncorrectable_Sector_Count"  ,"Reset at Power On")  // A0
-MAP_ITEM(161,  true, "Valid_Spare_Block"           ,"Life Cumulative")  // A1
-MAP_ITEM(163, false, "Initial_Invalid_Block"       ,"")  // A3
-MAP_ITEM(164, false, "Total_Erase_Count"           ,"")  // A4
-MAP_ITEM(165, false, "Maximum_Erase_Count"         ,"")  // A5
-MAP_ITEM(166, false, "Minimum_Erase_Count"         ,"")  // A6
-MAP_ITEM(167, false, "Average_Erase_Count"         ,"")  // A7
-MAP_ITEM(169,  true, "Remaining_Life_Left"         ,"")  // A9 - Old ID of Remaining_Life_Left
-MAP_ITEM(181, false, "Total_Program_Fail"          ,"Life Cumulative")  // B5
-MAP_ITEM(182, false, "Total_Erase_Fail"            ,"Life Cumulative")  // B6
+MAP_ITEM(SMA_RAW_READ_ERROR         , 1  ,  true, "Raw_Read_Error_Rate"         ,"Reset at Power On")
+MAP_ITEM(SMA_REALLOCATED_SECTOR     , 5  , false, "Reallocated_Sector_Ct"       ,"")
+MAP_ITEM(SMA_POWER_ON_HOURS         , 9  ,  true, "Power_On_Hours"              ,"Reset at Power On")
+MAP_ITEM(SMA_POWER_CYCLE_COUNT      , 12 ,  true, "Power_Cycle_Count"           ,"Life Cumulative")  // 0C
+MAP_ITEM(SMA_SUDDEN_POWER_LOST_COUNT, 192,  true, "Sudden_Power_Lost_Count"     ,"Life Cumulative")  // C0
+MAP_ITEM(SMA_TEMPERATURE_CELSIUS    , 194,  true, "Temperature_Celsius"         ,"")  // C2
+MAP_ITEM(SMA_HARDWARE_ECC_RECOVERED , 195, false, "Hardware_ECC_Recovered"      ,"")  // C3
+MAP_ITEM(SMA_REALLOCATED_EVENT_COUNT, 196,  true, "Reallocated_Event_Count"     ,"")  // C4
+MAP_ITEM(SMA_PENDING_SECTOR_COUNT   , 197,  true, "Current_Pending_Sector_Count","")  //C5
+MAP_ITEM(SMA_OFFLINE_INCORRECTABLE  , 198, false, "Offline_Uncorrectable"       ,"")  // C6
+MAP_ITEM(SMA_UDMA_CRC_ERROR_COUNT   , 199,  true, "UDMA_CRC_Error_Count"        ,"Life Cumulative")  // C7
+MAP_ITEM(SMA_TOTAL_LBA_WRITTEN      , 241,  true, "Total_LBAs_Written"          ,"Life Cumulative")  // F1
+MAP_ITEM(SMA_TOTAL_LBA_READ         , 242,  true, "Total_LBAs_Read"             ,"Life Cumulative")  // F2
+MAP_ITEM(SMA_REMAINING_LIFE_LEFT    , 248,  true, "Remaining_Life_Left"         ,"Life Cumulative")  // F8
+MAP_ITEM(SMA_REMAINING_SPARE_COUNT  , 249,  true, "Remaining_Spare_Block_Count" ,"Life Cumulative")  // F9
+MAP_ITEM(SMA_UNCORRECTABLE_COUNT    , 160,  true, "Uncorrectable_Sector_Count"  ,"Reset at Power On")  // A0
+MAP_ITEM(SMA_VALID_SPARE_BLOCK      , 161,  true, "Valid_Spare_Block"           ,"Life Cumulative")  // A1
+MAP_ITEM(SMA_INITIAL_INVALID_BLOCK  , 163, false, "Initial_Invalid_Block"       ,"")  // A3
+MAP_ITEM(SMA_TOTAL_ERASE_COUNT      , 164, false, "Total_Erase_Count"           ,"")  // A4
+MAP_ITEM(SMA_MAXIMUM_ERASE_COUNT    , 165, false, "Maximum_Erase_Count"         ,"")  // A5
+MAP_ITEM(SMA_MINIMUM_ERASE_COUNT    , 166, false, "Minimum_Erase_Count"         ,"")  // A6
+MAP_ITEM(SMA_AVERAGE_ERASE_COUNT    , 167, false, "Average_Erase_Count"         ,"")  // A7
+// MAP_ITEM(SMA_REMAINING_LIFE_LEFT    , 169,  true, "Remaining_Life_Left"         ,"")  // A9 - Old ID of Remaining_Life_Left
+MAP_ITEM(SMA_TOTAL_PROGRAM_FAIL     , 181, false, "Total_Program_Fail"          ,"Life Cumulative")  // B5
+MAP_ITEM(SMA_TOTAL_ERASE_FAIL       , 182, false, "Total_Erase_Fail"            ,"Life Cumulative")  // B6
+
+MAP_ITEM(SMA_RESERVED01             , 131, false, "Temperature_Sensor1"         ,"")  // 80
+MAP_ITEM(SMA_RESERVED02             , 132, false, "Temperature_Sensor2"         ,"")  // 80
+MAP_ITEM(SMA_RESERVED03             , 133, false, "Temperature_Sensor3"         ,"")  // 80
+MAP_ITEM(SMA_RESERVED04             , 134, false, "Temperature_Sensor4"         ,"")  // 80
+MAP_ITEM(SMA_RESERVED05             , 135, false, "Temperature_Sensor5"         ,"")  // 80
+MAP_ITEM(SMA_RESERVED06             , 136, false, "Temperature_Sensor6"         ,"")  // 80
+MAP_ITEM(SMA_RESERVED07             , 137, false, "Temperature_Sensor7"         ,"")  // 80
+MAP_ITEM(SMA_RESERVED08             , 138, false, "Temperature_Sensor8"         ,"")  // 80
+
+MAP_ITEM(SMA_RESERVED11             , 141, false, "Warning_Composite_Temperature_Time"         ,"")  // 80
+MAP_ITEM(SMA_RESERVED12             , 142, false, "Critical_Composite_Temperature_Time"         ,"")  // 80
+
+MAP_ITEM(SMA_RESERVED21             , 151, false, "Media_Errors"                ,"")  // 80
+MAP_ITEM(SMA_RESERVED22             , 152, false, "Error_Info_Log_Entry_Count"  ,"")  // 80
+MAP_ITEM(SMA_RESERVED23             , 153, false, "Controller_Busy_Time"        ,"")  // 80
+MAP_ITEM(SMA_RESERVED24             , 154, false, "Host_Read_Commands"          ,"")  // 80
+MAP_ITEM(SMA_RESERVED25             , 155, false, "Host_Written_Commands"       ,"")  // 80
