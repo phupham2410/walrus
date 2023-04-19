@@ -395,7 +395,7 @@ void MainWindow::handleViewSmart()
     RETURN_WRONG_INDEX_IF((idx < 0) || (idx >= maxi));
     const StorageApi::sDriveInfo& drv = scan.darr[idx];
     RETURN_NOT_SUPPORT_IF(!drv.id.features.smart);
-    setLog(QString(StorageApi::ToString(drv.si).c_str()));
+    setLog(QString(StorageApi::ToString(drv.si, true, 2).c_str()));
 }
 
 // ----------------------------------------------------------------------------

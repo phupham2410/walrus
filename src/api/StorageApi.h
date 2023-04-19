@@ -106,12 +106,19 @@ namespace StorageApi {
         sIdentify();
     };
 
+    enum eAttrType {
+        AT_ATA  = 0x00,
+        AT_NVME = 0x01,
+        AT_INVALID = 0xFF,
+    };
+
     struct sSmartAttr {
-        U8  id, value;
-        U8 worst, threshold;
+        U16 id;
+        U8 value, worst, threshold;
         U32 loraw, hiraw;
         STR name;
         STR note;
+        eAttrType type;
 
         void reset();
         sSmartAttr();
@@ -204,17 +211,18 @@ namespace StorageApi {
     // ToString utilities
     STR ToString(eRetCode code);
     STR ToString(const sDriveInfo& drv, U32 indent = 0);
-    STR ToString(const sSmartInfo& sm, U32 indent = 0);
     STR ToString(const sIdentify& id, U32 indent = 0);
     STR ToString(const sFeature& ftr, U32 indent = 0);
-    STR ToString(const sSmartAttr& attr, U32 indent = 0);
     STR ToString(const U8* bufptr, U32 bufsize);
     STR ToString(const sPartition& pt, U32 indent = 0);
     STR ToString(const sPartInfo& pi, U32 indent = 0);
+    STR ToString(const sSmartAttr& attr, U32 indent = 0);
+    STR ToString(const sSmartInfo& sm, bool hdr = false, U32 indent = 0);
 
     WSTR ToWideString(const sPartition& pt, U32 indent = 0);
     WSTR ToWideString(const sPartInfo& pi, U32 indent = 0);
 
+    STR ToCsvString(const sSmartAttr& attr);
     STR ToShortString(const sDriveInfo& drv, U32 indent = 0);
 
     // Get list of plugged-in drives

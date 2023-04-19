@@ -20,14 +20,14 @@
     CASTBUF64(hval, _hbuf); CASTBUF64(lval, _lbuf); } while(0)
 
 static eRetCode ScanDrive_NvmeBus(sPHYDRVINFO& phy, U32 index, bool rsm, sDriveInfo& di, volatile sProgress *p) {
-    bool status;
+    bool status; (void) rsm; (void) index;
     NVME_IDENTIFY_CONTROLLER_DATA ctrl;
     NVME_HEALTH_INFO_LOG hlog;
 
     status = NvmeUtil::IdentifyController((HANDLE) phy.DriveHandle, &ctrl);
     if (!status) return RET_FAIL;
 
-    status = NvmeUtil::GetSMARTHealthInfoLog((HANDLE) phy.DriveHandle, &hlog);
+    status = NvmeUtil::GetSMARTHealthInfoLog2((HANDLE) phy.DriveHandle, &hlog);
     if (!status) return RET_FAIL;
 
     StorageApi::sIdentify& id = di.id;
@@ -43,48 +43,49 @@ static eRetCode ScanDrive_NvmeBus(sPHYDRVINFO& phy, U32 index, bool rsm, sDriveI
     id.cap = 9999.99;
 
     StorageApi::sFeature& ftr = di.id.features;
-    ftr.smart = ctrl.LPA.SmartPagePerNamespace;
+    ftr.smart = 1; // for NVMe: 1
     ftr.test = ctrl.OACS.DeviceSelfTest;
 
     StorageApi::sSmartInfo& si = di.si;
     if (1) {
         uint32_t val; CASTBUF16(val, hlog.Temperature);
-        ApiUtil::SetSmartRaw(si.amap, SMA_TEMPERATURE_CELSIUS, val, 0);
+        ApiUtil::SetSmartRaw(si.amap, SMA_COMPOSITE_TEMP, val, 0);
     }
 
-    ApiUtil::SetSmartRaw(si.amap, SMA_REMAINING_SPARE_COUNT, hlog.AvailableSpare, 0, hlog.AvailableSpareThreshold);
-    ApiUtil::SetSmartRaw(si.amap, SMA_REMAINING_LIFE_LEFT,   hlog.PercentageUsed, 0);
+    ApiUtil::SetSmartRaw(si.amap, SMA_SPARE_PERCENTAGE, hlog.AvailableSpare, 0);
+    ApiUtil::SetSmartRaw(si.amap, SMA_SPARE_THRESHOLD, hlog.AvailableSpareThreshold, 0);
+    ApiUtil::SetSmartRaw(si.amap, SMA_PERCENTAGE_USED, hlog.PercentageUsed, 0);
 
     uint64_t dl, dh; // Data Unit Read (sector)
     #define MAP_ITEM(name, attrid) \
         CASTBUF128(dh, dl, hlog.name); if (dh) return RET_OUT_OF_SPACE; \
         ApiUtil::SetSmartRaw(si.amap, attrid, dl & MASK32B, (dl >> 32) & MASK32B)
-    MAP_ITEM(DataUnitRead, SMA_TOTAL_LBA_READ);
-    MAP_ITEM(DataUnitWritten, SMA_TOTAL_LBA_WRITTEN);
-    MAP_ITEM(PowerCycle, SMA_POWER_CYCLE_COUNT);
-    MAP_ITEM(PowerOnHours, SMA_POWER_ON_HOURS);
-    MAP_ITEM(UnsafeShutdowns, SMA_SUDDEN_POWER_LOST_COUNT);
+    MAP_ITEM(DataUnitRead, SMA_DATA_UNIT_READ);
+    MAP_ITEM(DataUnitWritten, SMA_DATA_UNIT_WRITTEN);
+    MAP_ITEM(PowerCycle, SMA_POWER_CYCLE);
+    MAP_ITEM(PowerOnHours, SMA_NVME_POWER_ON_HOURS);
+    MAP_ITEM(UnsafeShutdowns, SMA_UNSAFE_SHUTDOWNS);
 
-    MAP_ITEM(MediaErrors, SMA_RESERVED21);
-    MAP_ITEM(ErrorInfoLogEntryCount, SMA_RESERVED22);
-    MAP_ITEM(ControllerBusyTime, SMA_RESERVED23);
-    MAP_ITEM(HostReadCommands, SMA_RESERVED24);
-    MAP_ITEM(HostWrittenCommands, SMA_RESERVED25);
+    MAP_ITEM(MediaErrors, SMA_MEDIA_ERRORS);
+    MAP_ITEM(ErrorInfoLogEntryCount, SMA_ERROR_LOG_COUNT);
+    MAP_ITEM(ControllerBusyTime, SMA_CTRL_BUSY_TIME);
+    MAP_ITEM(HostReadCommands, SMA_HOST_CMD_READ);
+    MAP_ITEM(HostWrittenCommands, SMA_HOST_CMD_WRITTEN);
     #undef MAP_ITEM
 
     #define MAP_ITEM(name, attrid) \
         ApiUtil::SetSmartRaw(si.amap, attrid, hlog.name, 0)
-    MAP_ITEM(TemperatureSensor1, SMA_RESERVED01);
-    MAP_ITEM(TemperatureSensor2, SMA_RESERVED02);
-    MAP_ITEM(TemperatureSensor3, SMA_RESERVED03);
-    MAP_ITEM(TemperatureSensor4, SMA_RESERVED04);
-    MAP_ITEM(TemperatureSensor5, SMA_RESERVED05);
-    MAP_ITEM(TemperatureSensor6, SMA_RESERVED06);
-    MAP_ITEM(TemperatureSensor7, SMA_RESERVED07);
-    MAP_ITEM(TemperatureSensor8, SMA_RESERVED08);
+    MAP_ITEM(TemperatureSensor1, SMA_TEMP_SENSOR_1);
+    MAP_ITEM(TemperatureSensor2, SMA_TEMP_SENSOR_2);
+    MAP_ITEM(TemperatureSensor3, SMA_TEMP_SENSOR_3);
+    MAP_ITEM(TemperatureSensor4, SMA_TEMP_SENSOR_4);
+    MAP_ITEM(TemperatureSensor5, SMA_TEMP_SENSOR_5);
+    MAP_ITEM(TemperatureSensor6, SMA_TEMP_SENSOR_6);
+    MAP_ITEM(TemperatureSensor7, SMA_TEMP_SENSOR_7);
+    MAP_ITEM(TemperatureSensor8, SMA_TEMP_SENSOR_8);
 
-    MAP_ITEM(WarningCompositeTemperatureTime, SMA_RESERVED11);
-    MAP_ITEM(CriticalCompositeTemperatureTime, SMA_RESERVED12);
+    MAP_ITEM(WarningCompositeTemperatureTime, SMA_TEMP_WARNING);
+    MAP_ITEM(CriticalCompositeTemperatureTime, SMA_TEMP_CRITICAL);
     #undef MAP_ITEM
 
     UPDATE_PROGRESS(p, 6);

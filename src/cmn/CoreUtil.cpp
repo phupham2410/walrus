@@ -6,7 +6,7 @@ cCoreUtil::sUtilData cCoreUtil::s_Data;
 void cCoreUtil::sUtilData::InitAttrNameMap()
 {
     // Init AttributeName map
-    typedef pair<U8, sATTRPARAM> tItemInfo;
+    typedef pair<U16, sATTRPARAM> tItemInfo;
     tItemInfo itemArray[] = {
         #define MAP_ITEM(code, val, show, name, note) tItemInfo(val, sATTRPARAM(name, note, show)),
         #include "AttrName.def"
@@ -49,7 +49,7 @@ cCoreUtil::sUtilData::sUtilData()
     InitIdentifyKeyMap();
 }
 
-bool cCoreUtil::LookupAttributeName(U8 id, string& name)
+bool cCoreUtil::LookupAttributeName(U16 id, string& name)
 {   
     bool status = false;
 
@@ -64,32 +64,7 @@ bool cCoreUtil::LookupAttributeName(U8 id, string& name)
     return status;
 }
 
-void cCoreUtil::LookupAttributeList(vector<string>& attrList)
-{
-    attrList.clear();
-
-    tATTRNAMEMAP::iterator iter;
-    for(iter = s_Data.m_AttrNameMap.begin(); iter != s_Data.m_AttrNameMap.end(); iter++)
-    {
-        const sATTRPARAM& param = iter->second;
-        attrList.push_back(param.Name);
-    }
-}
-
-void cCoreUtil::LookupAttributeList(vector<pair<U8, string> >& attrList)
-{
-    attrList.clear();
-
-    tATTRNAMEMAP::iterator iter;
-    for(iter = s_Data.m_AttrNameMap.begin(); iter != s_Data.m_AttrNameMap.end(); iter++)
-    {
-        U8 attrID = iter->first;
-        const sATTRPARAM& param = iter->second;
-        attrList.push_back(pair<U8, string> (attrID, param.Name));
-    }
-}
-
-bool cCoreUtil::LookupAttributeNote(U8 id, string& note)
+bool cCoreUtil::LookupAttributeNote(U16 id, string& note)
 {
     bool status = false;
 
@@ -104,7 +79,7 @@ bool cCoreUtil::LookupAttributeNote(U8 id, string& note)
     return status;
 }
 
-bool cCoreUtil::LookupAttributeText(U8 id, string& name, string& note)
+bool cCoreUtil::LookupAttributeText(U16 id, string& name, string& note)
 {
     bool status = false;
 

@@ -1,10 +1,12 @@
 
 #include "ApiUtil.h"
+#include "CoreUtil.h"
 
 using namespace StorageApi;
 
 void ApiUtil::ConvertSmartAttr(const sSMARTATTR& src, sSmartAttr& dst) {
     dst.reset();
+    dst.type = eAttrType((src.ID >> 8) & 0xFF);
     #define MAP_ITEM(d, s) dst.d = src.s
     MAP_ITEM(worst, Worst); MAP_ITEM(threshold, Threshold);
     MAP_ITEM(id, ID); MAP_ITEM(name, Name); MAP_ITEM(value, Value);
@@ -42,41 +44,98 @@ void ApiUtil::ConvertIdentify(const sIDENTIFY& src, sIdentify& dst) {
     ApiUtil::ConvertFeatures(src.SectorInfo, dst.features);
 }
 
-bool ApiUtil::GetSmartAttr(const tAttrMap& smap, U8 id, sSmartAttr& attr) {
+bool ApiUtil::GetSmartAttr(const tAttrMap& smap, U16 id, sSmartAttr& attr) {
     tAttrConstIter iter = smap.find(id);
     if (iter == smap.end()) return false;
     attr = iter->second; return true;
 }
 
-bool ApiUtil::GetSmartRaw(const tAttrMap& smap, U8 id, U32& lo, U32& hi) {
+bool ApiUtil::GetSmartRaw(const tAttrMap& smap, U16 id, U32& lo, U32& hi) {
     sSmartAttr attr;
     if (!ApiUtil::GetSmartAttr(smap, id, attr)) return false;
     lo = attr.loraw; hi = attr.hiraw; return true;
 }
 
-bool ApiUtil::GetSmartValue(const tAttrMap& smap, U8 id, U8& val) {
+bool ApiUtil::GetSmartValue(const tAttrMap& smap, U16 id, U8& val) {
     sSmartAttr attr;
     if (!ApiUtil::GetSmartAttr(smap, id, attr)) return false;
     val = attr.value; return true;
 }
 
-sSmartAttr& ApiUtil::GetSmartAttrRef(tAttrMap& smap, U8 id) {
+sSmartAttr& ApiUtil::GetSmartAttrRef(tAttrMap& smap, U16 id) {
     tAttrIter iter = smap.find(id);
     if (iter == smap.end()) {
-        smap[id] = sSmartAttr();
+        sSmartAttr sm; sm.id = id;
+        sm.type = eAttrType((id >> 8) & 0xFF);
+        cCoreUtil::LookupAttributeName(sm.id, sm.name);
+        smap[id] = sm;
         iter = smap.find(id);
     }
     return iter->second;
 }
 
-bool ApiUtil::SetSmartRaw(tAttrMap& smap, U8 id, U32 lo, U32 hi) {
+bool ApiUtil::SetSmartRaw(tAttrMap& smap, U16 id, U32 lo, U32 hi) {
     sSmartAttr& attr = GetSmartAttrRef(smap, id);
     attr.loraw = lo; attr.hiraw = hi; return true;
 }
 
-bool ApiUtil::SetSmartRaw(tAttrMap& smap, U8 id, U32 lo, U32 hi, U32 thr) {
-    sSmartAttr& attr = GetSmartAttrRef(smap, id);
-    attr.loraw = lo; attr.hiraw = hi; attr.threshold = thr; return true;
+STR ApiUtil::ToAtaAttrString̣̣̣̣̣̣(const StorageApi::sSmartAttr& sa, const char* sep) {
+    char buffer[2048];
+    sprintf(buffer, "%02X%s%30s%s%3d%s%3d%s%3d%s%08d%s%08d%s%s",
+            sa.id, sep, sa.name.c_str(), sep,
+            sa.value, sep, sa.worst, sep, sa.threshold, sep,
+            sa.loraw, sep, sa.hiraw, sep, sa.note.c_str());
+    return STR(buffer);
+}
+
+STR ApiUtil::ToAttrValueString(U16 id, U32 loraw, U32 hiraw) {
+    char buffer[1024];
+    switch(id) {
+        case SMA_DATA_UNIT_READ   :
+        case SMA_DATA_UNIT_WRITTEN: {
+            U64 lba = (((uint64_t)hiraw << 32) | loraw) * 1000;
+            F64 lba_gb = ((lba * 100) >> 21) / 100.0;
+            sprintf(buffer, "%0.2f GB", lba_gb);
+        } break;
+
+        case SMA_COMPOSITE_TEMP   : {
+            U32 celsius = loraw - 273; sprintf(buffer, "%d", celsius);
+        } break;
+
+        case SMA_CTRL_BUSY_TIME   : sprintf(buffer, "%d m", loraw); break;
+
+        case SMA_POWER_CYCLE        :
+        case SMA_NVME_POWER_ON_HOURS:
+        case SMA_UNSAFE_SHUTDOWNS   :
+        case SMA_SPARE_PERCENTAGE   :
+        case SMA_SPARE_THRESHOLD    :
+        case SMA_PERCENTAGE_USED    :
+        case SMA_TEMP_SENSOR_1      :
+        case SMA_TEMP_SENSOR_2      :
+        case SMA_TEMP_SENSOR_3      :
+        case SMA_TEMP_SENSOR_4      :
+        case SMA_TEMP_SENSOR_5      :
+        case SMA_TEMP_SENSOR_6      :
+        case SMA_TEMP_SENSOR_7      :
+        case SMA_TEMP_SENSOR_8      :
+        case SMA_TEMP_WARNING       :
+        case SMA_TEMP_CRITICAL      :
+        case SMA_MEDIA_ERRORS       :
+        case SMA_ERROR_LOG_COUNT    :
+        case SMA_HOST_CMD_READ      :
+        case SMA_HOST_CMD_WRITTEN   : sprintf(buffer, "%d", loraw); break;
+
+        default: sprintf(buffer, "%d", loraw); break;
+    }
+
+        return STR(buffer);
+}
+
+STR ApiUtil::ToNvmeAttrString̣̣̣̣̣̣(const StorageApi::sSmartAttr& sa, const char* sep) {
+    STR vstr = ApiUtil::ToAttrValueString(sa.id, sa.loraw, sa.hiraw);
+    char buffer[2048]; sprintf(buffer, "%30s%s%16s%s%08d",
+                               sa.name.c_str(), sep, vstr.c_str(), sep, sa.loraw);
+    return STR(buffer);
 }
 
 void ApiUtil::UpdateDriveInfo(const sDRVINFO& src, sDriveInfo& dst) {

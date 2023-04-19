@@ -52,7 +52,7 @@ static eRetCode ScanDrive_SataBus(sPHYDRVINFO& phy, U32 index, bool rsm, sDriveI
 }
 
 static eRetCode Read_SataBus(HDL handle, U64 lba, U32 count, U8 *buffer, volatile sProgress *p) {
-    U64 bufsize = count * SECTOR_SIZE;
+    U64 bufsize = count * SECTOR_SIZE; (void) p;
     AtaCmd cmd; cmd.setCommand(lba, count, CMD_READ_DMA_48B);
     if (!TRY_TO_EXECUTE_COMMAND(handle, cmd)) {
         memset(buffer, 0x00, bufsize); return RET_FAIL;

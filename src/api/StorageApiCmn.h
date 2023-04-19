@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <windows.h>
 
+#include "ApiUtil.h"
 #include "HexFrmt.h"
 #include "StorageApi.h"
 
@@ -238,19 +239,36 @@ STR StorageApi::ToString(const StorageApi::sIdentify& id, U32 indent) {
 }
 
 STR StorageApi::ToString(const StorageApi::sSmartAttr& sa, U32 indent) {
-    char buffer[2048]; STR prefix (indent, ' ');
-    sprintf(buffer, "%02X %30s %3d %3d %06d %06d %3d %s",
-            sa.id, sa.name.c_str(), sa.value, sa.threshold,
-            sa.loraw, sa.hiraw, sa.worst, sa.note.c_str());
-    return prefix + std::string(buffer);
+    STR prefix (indent, ' '), astr;
+    switch(sa.type) {
+        case AT_ATA: astr = ApiUtil::ToAtaAttrString̣̣̣̣̣̣(sa); break;
+        case AT_NVME: astr = ApiUtil::ToNvmeAttrString̣̣̣̣̣̣(sa); break;
+        default: astr = "Unknown_Attribute_Type"; break;
+    }
+    return prefix + astr;
 }
 
-STR StorageApi::ToString(const StorageApi::sSmartInfo& sm, U32 indent) {
-    std::stringstream sstr; STR prefix (indent, ' ');
+STR StorageApi::ToString(const StorageApi::sSmartInfo& sm, bool hdr, U32 indent) {
+    std::stringstream sstr, hstr; STR prefix (indent, ' ');
+
+    eAttrType type = AT_INVALID;
+
     for (tAttrConstIter iter = sm.amap.begin(); iter != sm.amap.end(); iter++) {
-        sstr << prefix << ToString(iter->second, 0) << ENDL;
+        const sSmartAttr& attr = iter->second;
+        if (type == AT_INVALID) type = attr.type;
+        // sstr << prefix << ToString(attr, 0) << ENDL;
+        sstr << prefix << ToCsvString(attr) << ENDL;
     }
-    return sstr.str();
+
+    if (hdr) {
+        STR atahdr  = "ID                 Attribute Name"
+                      " Val Wrs Thr    RawLo    RawHi Note";
+        STR nvmehdr = "                Attribute Name"
+                      "            Value RawValue";
+        hstr << prefix << ((type == AT_NVME) ? nvmehdr : atahdr) << ENDL;
+    }
+
+    return hstr.str() + sstr.str();
 }
 
 STR StorageApi::ToString(const StorageApi::sPartition& pt, U32 indent) {
@@ -312,6 +330,16 @@ STR StorageApi::ToString(const StorageApi::sDriveInfo &drv, U32 indent) {
     return sstr.str();
 }
 
+STR StorageApi::ToCsvString(const StorageApi::sSmartAttr& sa) {
+    STR rstr; const char* sep = ";";
+    switch(sa.type) {
+    case AT_ATA: rstr = ApiUtil::ToAtaAttrString̣̣̣̣̣̣(sa, sep); break;
+    case AT_NVME: rstr = ApiUtil::ToNvmeAttrString̣̣̣̣̣̣(sa, sep); break;
+    default: rstr = "Unknown_Attribute_Type"; break;
+    }
+    return rstr;
+}
+
 STR StorageApi::ToShortString(const StorageApi::sDriveInfo &drv, U32 indent) {
     // Show drive info without Partitions and SMART
     std::stringstream sstr; STR prefix (indent, ' '); U32  sub = indent + 2;
@@ -334,7 +362,7 @@ STR StorageApi::ToString(const U8 *bufptr, U32 bufsize) {
 }
 
 STR StorageApi::ToString(const sAdapterInfo &pi, U32 indent) {
-    std::stringstream sstr; STR prefix (indent, ' '); U32  sub = indent + 2;
+    std::stringstream sstr; STR prefix (indent, ' ');
     #define MAP_ITEM(nlmid, nlend, text, val) do { \
         sstr << prefix << text << ": "; \
             if (nlmid) { sstr << ENDL; } sstr << val; if (nlend) { sstr << ENDL; }} while(0)
