@@ -44,10 +44,11 @@ static eRetCode ScanDrive_NvmeBus(sPHYDRVINFO& phy, U32 index, bool rsm, sDriveI
 
     StorageApi::sFeature& ftr = di.id.features;
     ftr.smart = ctrl.LPA.SmartPagePerNamespace;
+    ftr.test = ctrl.OACS.DeviceSelfTest;
 
     StorageApi::sSmartInfo& si = di.si;
     if (1) {
-        uint32_t val = ((uint32_t) hlog.Temperature[1] << 8) | ((uint32_t) hlog.Temperature[0]);
+        uint32_t val; CASTBUF16(val, hlog.Temperature);
         ApiUtil::SetSmartRaw(si.amap, SMA_TEMPERATURE_CELSIUS, val, 0);
     }
 
