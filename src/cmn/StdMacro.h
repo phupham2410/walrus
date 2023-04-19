@@ -44,6 +44,10 @@ typedef unsigned long long U64;
 
 #define ALLOC_OBJ(type, name) name = new type
 #define ALLOC_PTR(type, name) type* name = new type
+#define TMPBUFFER_N(name, size) char name[size] = {0}
+#define TMPBUFFER(name) TMPBUFFER_N(name, 512)
+#define TMPBUFFER1K(name) TMPBUFFER_N(name, 1024)
+#define TMPBUFFER2K(name) TMPBUFFER_N(name, 2048)
 
 #define DEF_TYPE02(name, type0, name0, type1, name1) \
 struct name { \
