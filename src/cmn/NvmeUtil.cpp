@@ -240,7 +240,9 @@ BOOL NvmeUtil::GetSMARTHealthInfoLog(HANDLE hDevice, PNVME_HEALTH_INFO_LOG pHeal
     protocolData->ProtocolType = ProtocolTypeNvme;
     protocolData->DataType = NVMeDataTypeLogPage;
     protocolData->ProtocolDataRequestValue = NVME_LOG_PAGE_HEALTH_INFO;
-    protocolData->ProtocolDataRequestSubValue = NVME_NAMESPACE_ALL;
+    // FIXME_PP: Confirm with Nguyen. SubValue is 0 or NVME_NAMESPACE_ALL
+    //           NVME_NAMESPACE_APP not work on Micron nvme ssd
+    protocolData->ProtocolDataRequestSubValue = 0; // NVME_NAMESPACE_ALL;
     protocolData->ProtocolDataOffset = sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA);
     protocolData->ProtocolDataLength = sizeof(NVME_HEALTH_INFO_LOG);
 

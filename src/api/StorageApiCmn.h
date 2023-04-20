@@ -263,7 +263,7 @@ STR StorageApi::ToString(const StorageApi::sSmartInfo& sm, bool hdr, U32 indent)
         STR atahdr  = "ID                 Attribute Name"
                       " Val Wrs Thr    RawLo    RawHi Note";
         STR nvmehdr = "                Attribute Name"
-                      "            Value RawValue";
+                      "            Value   RawValue";
         hstr << prefix << ((type == AT_NVME) ? nvmehdr : atahdr) << ENDL;
     }
 

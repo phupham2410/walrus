@@ -57,10 +57,8 @@ static eRetCode ConvertIdentify(const NVME_IDENTIFY_CONTROLLER_DATA& ctrl, sIden
         id.cap = evn;
     }
     else{
-        U64 max_data_transfer_size = ctrl.MDTS;
-        U64 num_logical_blocks = ctrl.NN;
-        U64 device_capacity = max_data_transfer_size * num_logical_blocks;
-        id.cap = device_capacity;
+        U64 mdts = ctrl.MDTS, blkcnt = ctrl.NN;
+        id.cap = mdts * blkcnt;
     }
 
     return RET_OK;
@@ -116,6 +114,7 @@ static eRetCode ScanDrive_NvmeBus(sPHYDRVINFO& phy, U32 index, bool rsm, sDriveI
     bool status; (void) rsm; (void) index;
     NVME_IDENTIFY_CONTROLLER_DATA ctrl;
     NVME_HEALTH_INFO_LOG hlog;
+    NVME_IDENTIFY_NAMESPACE_DATA nmsp;
 
     status = NvmeUtil::IdentifyController((HANDLE) phy.DriveHandle, &ctrl);
     if (!status) return RET_FAIL;
