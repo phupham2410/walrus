@@ -60,7 +60,7 @@ namespace StorageApi {
         U8 security;          // (Y/N) Supported Security feature
         U8 ncq;               // (Y/N) Supported NCQ mode
         U8 test;              // (Y/N) Supported SelfTest
-        U8 erase;             // (Y/N) Supported SecureErase
+        U8 erase;             // (Y/N) Supported SecureErase Modes
         U8 dlcode;            // (Y/N) Supported Download Microcode
 
         void reset();

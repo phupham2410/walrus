@@ -96,10 +96,16 @@ STR ApiUtil::ToAttrValueString(U16 id, U32 loraw, U32 hiraw) {
             U64 lba = (((uint64_t)hiraw << 32) | loraw) * 1000;
             F64 lba_gb = ((lba * 100) >> 21) / 100.0;
             sprintf(buffer, "%0.2f GB", lba_gb);
+
+            if (lba_gb >= 1024) {
+                lba = lba >> 10;
+                F64 lba_tb = ((lba * 100) >> 21) / 100.0;
+                sprintf(buffer, "%0.2f TB", lba_tb);
+            }
         } break;
 
         case SMA_COMPOSITE_TEMP   : {
-            U32 celsius = loraw - 273; sprintf(buffer, "%d", celsius);
+            U32 celsius = loraw - 273; sprintf(buffer, "%d C", celsius);
         } break;
 
         case SMA_CTRL_BUSY_TIME   : sprintf(buffer, "%d m", loraw); break;
@@ -133,7 +139,7 @@ STR ApiUtil::ToAttrValueString(U16 id, U32 loraw, U32 hiraw) {
 
 STR ApiUtil::ToNvmeAttrString̣̣̣̣̣̣(const StorageApi::sSmartAttr& sa, const char* sep) {
     STR vstr = ApiUtil::ToAttrValueString(sa.id, sa.loraw, sa.hiraw);
-    char buffer[2048]; sprintf(buffer, "%30s%s%16s%s%08d",
+    char buffer[2048]; sprintf(buffer, "%30s%s%16s%s%10d",
                                sa.name.c_str(), sep, vstr.c_str(), sep, sa.loraw);
     return STR(buffer);
 }
@@ -155,19 +161,13 @@ void ApiUtil::UpdateDriveInfo(const sDRVINFO& src, sDriveInfo& dst) {
         }
     }
 
-    if (1) {
-        // Others
-        sSmartAttr attr;
-        if (ApiUtil::GetSmartAttr(dst.si.amap, SMA_TEMPERATURE_CELSIUS, attr)) {
-            dst.temp = ((U64)attr.hiraw << 32) | attr.loraw;
-        }
-
-        if (ApiUtil::GetSmartAttr(dst.si.amap, SMA_TOTAL_LBA_READ, attr)) {
-            dst.tread = ((U64)attr.hiraw << 32) | attr.loraw;
-        }
-
-        if (ApiUtil::GetSmartAttr(dst.si.amap, SMA_TOTAL_LBA_WRITTEN, attr)) {
-            dst.twrtn = ((U64)attr.hiraw << 32) | attr.loraw;
-        }
+    if (1) { // Others info
+        #define MAP_ITEM(name, attrid) do { \
+            sSmartAttr attr; if (ApiUtil::GetSmartAttr(dst.si.amap, attrid, attr)) { \
+                dst.name = ((U64)attr.hiraw << 32) | attr.loraw; }} while(0)
+        MAP_ITEM(temp, SMA_TEMPERATURE_CELSIUS);
+        MAP_ITEM(tread, SMA_TOTAL_LBA_READ);
+        MAP_ITEM(twrtn, SMA_TOTAL_LBA_WRITTEN);
+        #undef MAP_ITEM
     }
 }

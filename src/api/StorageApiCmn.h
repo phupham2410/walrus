@@ -256,8 +256,7 @@ STR StorageApi::ToString(const StorageApi::sSmartInfo& sm, bool hdr, U32 indent)
     for (tAttrConstIter iter = sm.amap.begin(); iter != sm.amap.end(); iter++) {
         const sSmartAttr& attr = iter->second;
         if (type == AT_INVALID) type = attr.type;
-        // sstr << prefix << ToString(attr, 0) << ENDL;
-        sstr << prefix << ToCsvString(attr) << ENDL;
+        sstr << prefix << ToString(attr, 0) << ENDL;
     }
 
     if (hdr) {
