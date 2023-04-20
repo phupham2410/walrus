@@ -146,6 +146,7 @@ namespace StorageApi {
         S64 temp;
         U64 tread;          // total host read
         U64 twrtn;          // total host write
+
         U8  bustype;
         U32 maxtfsec;       // Max transfer size in sector
 

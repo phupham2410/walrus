@@ -19,18 +19,12 @@
     const U8* _lbuf = buf, *_hbuf = buf + 8; \
     CASTBUF64(hval, _hbuf); CASTBUF64(lval, _lbuf); } while(0)
 
-static eRetCode ConvertFeatures(const NVME_IDENTIFY_CONTROLLER_DATA& ctrl, sFeature& ftr) {
-    ftr.smart = 1; // for NVMe: 1
-    ftr.test = ctrl.OACS.DeviceSelfTest;
-    ftr.erase = (ctrl.SANICAP.CryptoErase << 2) |
-                (ctrl.SANICAP.BlockErase << 1) |
-                (ctrl.SANICAP.Overwrite << 0);
-    ftr.security = ctrl.OACS.SecurityCommands;
-    ftr.dlcode = ctrl.OACS.FirmwareCommands;
-    return RET_OK;
-}
+typedef NVME_HEALTH_INFO_LOG tHealthLog;
+typedef NVME_IDENTIFY_CONTROLLER_DATA tCtrlData;
+typedef NVME_IDENTIFY_NAMESPACE_DATA tNsData;
+typedef std::vector<tNsData> tNsDataArr;
 
-static eRetCode ConvertIdentify(const NVME_IDENTIFY_CONTROLLER_DATA& ctrl, sIdentify& id) {
+static eRetCode ConvertIdentify(const tCtrlData& ctrl, const tNsDataArr& nsarr, sIdentify& id) {
     uint64_t dl, dh; // temporary values
 
     if (1) {
@@ -45,22 +39,25 @@ static eRetCode ConvertIdentify(const NVME_IDENTIFY_CONTROLLER_DATA& ctrl, sIden
         id.confid = "N/A";
     }
 
-    if (ctrl.OACS.NamespaceCommands) { // Get capacity info
-        CASTBUF128(dh, dl, (U8*) ctrl.TNVMCAP); // NVM capacity in bytes
-        U64 odd = dl & 0x3FFFFFFF; // low 30 bits
-        F64 odd_gb = ((odd * 100) >> 30) / 100.0;
-        U64 evn = ((dl >> 30) & 0x3FFFFFFFF) | (dh << 34);
-        F64 evn_gb = evn;
-        id.cap = evn_gb + odd_gb;
-
-        evn = (dl >> 30);
-        id.cap = evn;
-    }
-    else{
-        U64 mdts = ctrl.MDTS, blkcnt = ctrl.NN;
-        id.cap = mdts * blkcnt;
+    if (1) {
+        F64 cap = 0;
+        for (U32 i = 0, maxi = nsarr.size(); i < maxi; i++) {
+            cap += (nsarr[i].NSZE * 100 >> 21) / 100.0; // Capacity in GB
+        }
+        id.cap = cap;
     }
 
+    return RET_OK;
+}
+
+static eRetCode ConvertFeatures(const tCtrlData& ctrl, sFeature& ftr) {
+    ftr.smart = 1; // Always 1 for NVMe device
+    ftr.test = ctrl.OACS.DeviceSelfTest;
+    ftr.erase = (ctrl.SANICAP.CryptoErase << 2) |
+                (ctrl.SANICAP.BlockErase << 1) |
+                (ctrl.SANICAP.Overwrite << 0);
+    ftr.security = ctrl.OACS.SecurityCommands;
+    ftr.dlcode = ctrl.OACS.FirmwareCommands;
     return RET_OK;
 }
 
@@ -112,18 +109,22 @@ static eRetCode ConvertSmartInfo(const NVME_HEALTH_INFO_LOG& hlog, sSmartInfo& s
 
 static eRetCode ScanDrive_NvmeBus(sPHYDRVINFO& phy, U32 index, bool rsm, sDriveInfo& di, volatile sProgress *p) {
     bool status; (void) rsm; (void) index;
-    NVME_IDENTIFY_CONTROLLER_DATA ctrl;
-    NVME_HEALTH_INFO_LOG hlog;
-    NVME_IDENTIFY_NAMESPACE_DATA nmsp;
+    tCtrlData ctrl; tHealthLog hlog; tNsDataArr nsarr;
 
     status = NvmeUtil::IdentifyController((HANDLE) phy.DriveHandle, &ctrl);
     if (!status) return RET_FAIL;
+
+    for (U32 i = 0, maxi = ctrl.NN; i < maxi; i++) {
+        tNsData nmsp; memset(&nmsp, 0x00, sizeof(nmsp));
+        status = NvmeUtil::IdentifyNamespace((HANDLE) phy.DriveHandle, i + 1, &nmsp);
+        if (status) nsarr.push_back(nmsp); else return RET_FAIL;
+    }
 
     status = NvmeUtil::GetSMARTHealthInfoLog((HANDLE) phy.DriveHandle, &hlog);
     if (!status) return RET_FAIL;
 
     di.name = phy.DriveName;
-    ConvertIdentify(ctrl, di.id);
+    ConvertIdentify(ctrl, nsarr, di.id);
     ConvertFeatures(ctrl, di.id.features);
     ConvertSmartInfo(hlog, di.si);
 
