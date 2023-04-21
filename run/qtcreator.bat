@@ -1,1 +1,1 @@
-C:\Qt\Tools\QtCreator\bin\qtcreator.exe
+start "" C:\Qt\Tools\QtCreator\bin\qtcreator.exe

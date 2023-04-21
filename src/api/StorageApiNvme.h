@@ -23,6 +23,7 @@ typedef NVME_HEALTH_INFO_LOG tHealthLog;
 typedef NVME_IDENTIFY_CONTROLLER_DATA tCtrlData;
 typedef NVME_IDENTIFY_NAMESPACE_DATA tNsData;
 typedef std::vector<tNsData> tNsDataArr;
+typedef std::vector<tHealthLog> tHealthLogArr;
 
 static eRetCode ConvertIdentify(const tCtrlData& ctrl, const tNsDataArr& nsarr, sIdentify& id) {
     uint64_t dl, dh; // temporary values
@@ -109,24 +110,29 @@ static eRetCode ConvertSmartInfo(const NVME_HEALTH_INFO_LOG& hlog, sSmartInfo& s
 
 static eRetCode ScanDrive_NvmeBus(sPHYDRVINFO& phy, U32 index, bool rsm, sDriveInfo& di, volatile sProgress *p) {
     bool status; (void) rsm; (void) index;
-    tCtrlData ctrl; tHealthLog hlog; tNsDataArr nsarr;
+    tCtrlData ctrl; tNsDataArr nsarr; tHealthLogArr hlarr;
 
     status = NvmeUtil::IdentifyController((HANDLE) phy.DriveHandle, &ctrl);
     if (!status) return RET_FAIL;
 
-    for (U32 i = 0, maxi = ctrl.NN; i < maxi; i++) {
+    for (U32 i = 1, maxi = ctrl.NN; i <= maxi; i++) {
         tNsData nmsp; memset(&nmsp, 0x00, sizeof(nmsp));
-        status = NvmeUtil::IdentifyNamespace((HANDLE) phy.DriveHandle, i + 1, &nmsp);
+        status = NvmeUtil::IdentifyNamespace((HANDLE) phy.DriveHandle, i, &nmsp);
         if (status) nsarr.push_back(nmsp); else return RET_FAIL;
+
+        tHealthLog hlog; memset(&hlog, 0x00, sizeof(hlog));
+        status = NvmeUtil::GetHealthInfoLog((HANDLE) phy.DriveHandle, i, &hlog);
+        if (status) hlarr.push_back(hlog); else return RET_FAIL;
     }
 
-    status = NvmeUtil::GetSMARTHealthInfoLog((HANDLE) phy.DriveHandle, &hlog);
-    if (!status) return RET_FAIL;
+    if (!nsarr.max_size() || !hlarr.max_size()) return RET_FAIL;
 
     di.name = phy.DriveName;
     ConvertIdentify(ctrl, nsarr, di.id);
     ConvertFeatures(ctrl, di.id.features);
-    ConvertSmartInfo(hlog, di.si);
+
+    // FIXME_PP: Currently, get SMART from the first namespace only.
+    ConvertSmartInfo(hlarr[0], di.si);
 
     if (1) { // Others info
         #define MAP_ITEM(name, attrid) do { \
