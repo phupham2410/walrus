@@ -50,9 +50,14 @@ static eRetCode ConvertIdentify(const tCtrlData& ctrl, const tNsDataArr& nsarr, 
 static eRetCode ConvertFeatures(const tCtrlData& ctrl, sFeature& ftr) {
     ftr.smart = 1; // Always 1 for NVMe device
     ftr.test = ctrl.OACS.DeviceSelfTest;
+
+    // Check Sanitize or FormatNVM info ?
     ftr.erase = (ctrl.SANICAP.CryptoErase << 2) |
                 (ctrl.SANICAP.BlockErase << 1) |
                 (ctrl.SANICAP.Overwrite << 0);
+
+    // ftr.erase = ctrl.OACS.FormatNVM && ctrl.FNA.SecureEraseApplyToAll;
+
     ftr.security = ctrl.OACS.SecurityCommands;
     ftr.dlcode = ctrl.OACS.FirmwareCommands;
     return RET_OK;
@@ -124,8 +129,11 @@ static eRetCode ScanDrive_NvmeBus(sPHYDRVINFO& phy, U32 index, bool rsm, sDriveI
     if (!nsarr.max_size() || !hlarr.max_size()) return RET_FAIL;
 
     di.name = phy.DriveName;
+
     ConvertIdentify(ctrl, nsarr, di.id);
+
     ConvertFeatures(ctrl, di.id.features);
+    di.id.features.trim = ApiUtil::IsTrimSupported(phy.DriveHandle);
 
     // FIXME_PP: Currently, get SMART from the first namespace only.
     ConvertSmartInfo(hlarr[0], di.si);
@@ -140,6 +148,7 @@ static eRetCode ScanDrive_NvmeBus(sPHYDRVINFO& phy, U32 index, bool rsm, sDriveI
         MAP_ITEM(health, SMA_PERCENTAGE_USED);
         #undef MAP_ITEM
 
+        // Adjustment on NVME start data
         di.temp = di.temp - 273; // Kalvin -> Celsius
         di.tread = di.tread * 1000; // unit -> sector
         di.twrtn = di.twrtn * 1000; // unit -> sector

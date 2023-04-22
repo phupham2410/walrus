@@ -45,7 +45,7 @@ void PartWidget::initWidget() {
 
 void PartWidget::setPart(const StorageApi::sPartition& p) {
     F64 mincap = (p.cap * 100 >> 21) / 100.0;
-    F64 maxcap = ((mincap + 1000) / 512) * 512; // enable to extend some GB
+    F64 maxcap = maxcap = mincap + 200; // enable to extend 200GB
 
     wstringstream sstr;
     sstr << mincap << " GB" << endl; sstr << p.name;

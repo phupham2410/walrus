@@ -23,6 +23,8 @@ namespace ApiUtil {
     StorageApi::STR ToAttrValueString(U16 id, U32 loraw, U32 hiraw);
     StorageApi::STR ToNvmeAttrString̣̣̣̣̣̣(const StorageApi::sSmartAttr& sa, const char* sep = " ");
     StorageApi::STR ToAtaAttrString̣̣̣̣̣̣(const StorageApi::sSmartAttr& sa, const char* sep = " ");
+
+    bool IsTrimSupported(StorageApi::HDL hdl);
 }
 
 #endif

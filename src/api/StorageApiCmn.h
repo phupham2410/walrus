@@ -170,6 +170,11 @@ static STR ToBusTypeString(U32 bustype) {
         MAP_ITEM(BusTypeMmc              , 0xD );
         MAP_ITEM(BusTypeVirtual          , 0xE );
         MAP_ITEM(BusTypeFileBackedVirtual, 0xF );
+        MAP_ITEM(BusTypeSpaces           , 0x10);
+        MAP_ITEM(BusTypeNvme             , 0x11);
+        MAP_ITEM(BusTypeSCM              , 0x12);
+        MAP_ITEM(BusTypeUfs              , 0x13);
+        MAP_ITEM(BusTypeMax              , 0x14);
         MAP_ITEM(BusTypeMaxReserved      , 0x7F);
     }
     #undef MAP_ITEM
@@ -182,14 +187,14 @@ STR StorageApi::ToString(const StorageApi::sFeature& ft, U32 indent) {
         sstr << prefix << name << ": " << (flag ? "Yes" : "No"); if (e) sstr << ENDL
     #define MAP_ITEM(e, name, value) \
         sstr << prefix << name << ": " << (U32) value; if (e) sstr << ENDL
-    MAP_ITEM(1, "ATA Version", ft.ataversion);
-    MAP_FLAG(1, "LBA 48B", ft.lbamode);
-    MAP_FLAG(1, "DMA", ft.dma);
-    MAP_FLAG(1, "Over Provision", ft.provision);
+    // MAP_ITEM(1, "ATA Version", ft.ataversion);
+    // MAP_FLAG(1, "LBA 48B", ft.lbamode);
+    // MAP_FLAG(1, "DMA", ft.dma);
+    // MAP_FLAG(1, "Over Provision", ft.provision);
+    // MAP_FLAG(1, "NCQ", ft.ncq);
+    // MAP_FLAG(1, "Security", ft.security);
     MAP_FLAG(1, "TRIM Command", ft.trim);
     MAP_FLAG(1, "S.M.A.R.T.", ft.smart);
-    MAP_FLAG(1, "Security", ft.security);
-    MAP_FLAG(1, "NCQ", ft.ncq);
     MAP_FLAG(1, "Self Test", ft.test);
     MAP_FLAG(1, "Secure Wipe", ft.erase);
     MAP_FLAG(0, "Firmware Upgrade", ft.dlcode);
@@ -232,7 +237,7 @@ STR StorageApi::ToString(const StorageApi::sIdentify& id, U32 indent) {
     MAP_ITEM(0,1, "Serial"          , id.serial);
     MAP_ITEM(0,1, "Firmware Version", id.version);
     MAP_ITEM(0,1, "Configuration ID", id.confid);
-    MAP_ITEM(0,1, "Capacity(GB)"    , id.cap);
+    MAP_ITEM(0,1, "Capacity(GB)"    , (id.cap >> 21));
     MAP_ITEM(1,1, "Features"        , ToString(id.features, sub));
     #undef MAP_ITEM
     return sstr.str();
@@ -350,6 +355,7 @@ STR StorageApi::ToShortString(const StorageApi::sDriveInfo &drv, U32 indent) {
     MAP_ITEM(0,1, "Temperature"       , drv.temp);
     MAP_ITEM(0,1, "Total Host Read"   , drv.tread);
     MAP_ITEM(0,1, "Total Host Written", drv.twrtn);
+    MAP_ITEM(0,1, "Life Left"         , drv.health);
     MAP_ITEM(0,1, "Bus Type"          , ToBusTypeString(drv.bustype));
     MAP_ITEM(0,1, "MaxTransferSector" , drv.maxtfsec);
     #undef MAP_ITEM
@@ -365,7 +371,7 @@ STR StorageApi::ToString(const sAdapterInfo &pi, U32 indent) {
     #define MAP_ITEM(nlmid, nlend, text, val) do { \
         sstr << prefix << text << ": "; \
             if (nlmid) { sstr << ENDL; } sstr << val; if (nlend) { sstr << ENDL; }} while(0)
-        MAP_ITEM(0,1, "BusType"         , ToBusTypeString(pi.BusType));
+    MAP_ITEM(0,1, "BusType"         , ToBusTypeString(pi.BusType));
     MAP_ITEM(0,1, "MaxTransSector"  , pi.MaxTransferSector);
     #undef MAP_ITEM
     return sstr.str();

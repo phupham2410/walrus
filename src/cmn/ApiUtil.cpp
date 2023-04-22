@@ -2,6 +2,9 @@
 #include "ApiUtil.h"
 #include "CoreUtil.h"
 
+#include <windows.h>
+#include <winioctl.h>
+
 using namespace StorageApi;
 
 void ApiUtil::ConvertSmartAttr(const sSMARTATTR& src, sSmartAttr& dst) {
@@ -168,6 +171,22 @@ void ApiUtil::UpdateDriveInfo(const sDRVINFO& src, sDriveInfo& dst) {
         MAP_ITEM(temp, SMA_TEMPERATURE_CELSIUS);
         MAP_ITEM(tread, SMA_TOTAL_LBA_READ);
         MAP_ITEM(twrtn, SMA_TOTAL_LBA_WRITTEN);
+        MAP_ITEM(health, SMA_REMAINING_LIFE_LEFT);
         #undef MAP_ITEM
     }
+}
+
+bool ApiUtil::IsTrimSupported(HDL hdl) {
+    DEVICE_TRIM_DESCRIPTOR tdesc = { 0 };
+    DWORD retlen = 0;
+
+    STORAGE_PROPERTY_QUERY query;
+    query.PropertyId = StorageDeviceTrimProperty;
+    query.QueryType = PropertyStandardQuery;
+
+    BOOL result = DeviceIoControl((HANDLE) hdl, IOCTL_STORAGE_QUERY_PROPERTY,
+                                  &query, sizeof(query), &tdesc, sizeof(tdesc),
+                                  &retlen, NULL);
+
+    return (!result || (retlen != sizeof(tdesc))) ? false : tdesc.TrimEnabled;
 }
