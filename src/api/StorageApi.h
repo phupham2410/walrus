@@ -68,14 +68,14 @@ namespace StorageApi {
         sFeature(const U8* val);
     };
 
-    typedef std::pair<U64, U64> tPartAddr;      // pair<start, count>
+    typedef std::pair<U64, U64> tPartAddr;      // pair<start byte, byte count>
     typedef std::vector<tPartAddr> tAddrArray;  // List of partition's position
     typedef const tAddrArray tConstAddrArray;   // Constant vector
 
     struct sPartition {
         WSTR name;            // Partition name
         U32 index;            // Partition index
-        F64 cap;              // Capacity in GB (count * 512 bytes)
+        U64 cap;              // Capacity in sector
         tPartAddr addr;       // Partition address (start lba, sector count)
 
         void reset();
@@ -99,7 +99,7 @@ namespace StorageApi {
         STR serial;         // Serial string
         STR version;        // Firmware version
         STR confid;         // Configuration ID
-        F64 cap;            // Capacity in GB
+        U64 cap;            // Capacity in sector
         sFeature  features; // Supported features
 
         void reset();
@@ -118,6 +118,7 @@ namespace StorageApi {
         U32 loraw, hiraw;
         STR name;
         STR note;
+
         eAttrType type;
 
         void reset();
@@ -144,10 +145,11 @@ namespace StorageApi {
         sPartInfo  pi;      // Partitions info
 
         S64 temp;
-        U64 tread;          // total host read
-        U64 twrtn;          // total host write
+        U64 tread;          // total host read in sector
+        U64 twrtn;          // total host write in sector
+        U64 health;         // remaining life percentage
 
-        U8  bustype;
+        U8  bustype;        // Windows' STORAGE_BUS_TYPE
         U32 maxtfsec;       // Max transfer size in sector
 
         void reset();

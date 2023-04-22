@@ -173,7 +173,7 @@ string ToVerboseString(const sIDENTIFY& info)
     sstr << "Model: " << info.DeviceModel << endl;
     sstr << "Serial: " << info.SerialNumber << endl;
     sstr << "Version: " << info.FirmwareVersion << endl;
-    sstr << "UserCap: " << info.UserCapacity << endl;
+    sstr << "UserCap: " << (info.UserCapacity >> 21) << " GB" << endl;
 
     return sstr.str();
 }

@@ -14,15 +14,21 @@ TEMPLATE = app
 DEFINES += STORAGE_API_IMPL
 
 INCLUDEPATH += ./src
+INCLUDEPATH += ./src/misc
 
 SOURCES +=\
     ./src/Main.cpp \
     ./src/MainWindow.cpp \
-    ./src/Worker.cpp
+    ./src/Worker.cpp \
+    ./src/misc/PartWidget.cpp
 
 HEADERS  += \
     ./src/MainWindow.h \
-    ./src/Worker.h
+    ./src/Worker.h \
+    ./src/misc/PartWidget.h
+
+DISTFILES  += \
+    ./src/FuncList.def
 
 # StorageApi code
 include(../../api.pri)

@@ -132,7 +132,7 @@ void MainWindow::showDriveList()
     for(int i = 0, maxi = darr.size(); i < maxi; i++) {
         const StorageApi::sDriveInfo& drv = darr[i];
         std::stringstream sstr;
-        sstr << drv.id.cap << " GB" << std::endl;
+        sstr << (drv.id.cap >> 21) << " GB" << std::endl;
         sstr << drv.id.model << std::endl
              << std::string(MODEL_MAX_LEN, '-');
         lst->addItem(QString(sstr.str().c_str()));
@@ -263,6 +263,9 @@ static void FormatWidget(QListWidget* w) {
 
 static void FormatWidget(QComboBox* w) {
     QFont font("Courier New", 11); QFontMetrics fmtr(font);
+    int fw = fmtr.maxWidth(), fh = fmtr.height();
+    int minw = fw * 40; w->setMinimumWidth(minw);
+    int minh = 3 * fh; w->setMinimumHeight(minh);
     w->setFont(font); w->setStyleSheet("border: 1px solid");
 }
 
@@ -312,13 +315,15 @@ QWidget* MainWindow::buildWidget_Common(
     b->setContentsMargins(1,1,1,1);
     b->setSpacing(1); b->addWidget(text);
 
-    QHBoxLayout* r = new QHBoxLayout();
-    r->setContentsMargins(1,1,1,1);
-    r->setSpacing(1); r->addStretch();
-    for (int i = 0; i < cnt; i++) r->addWidget(btn[i]);
-    r->addStretch();
+    if (cnt) {
+        QHBoxLayout* r = new QHBoxLayout();
+        r->setContentsMargins(1,1,1,1);
+        r->setSpacing(1); r->addStretch();
+        for (int i = 0; i < cnt; i++) r->addWidget(btn[i]);
+        r->addStretch();
+        b->addLayout(r); b->addStretch();
+    }
 
-    b->addLayout(r); b->addStretch();
     w->setLayout(b);
     return w;
 }
@@ -339,10 +344,18 @@ QWidget* MainWindow::buildWidget_DiskClone() {
     ALLOC_WIDGET(QPlainTextEdit, ctrl.dc.Console );
     ALLOC_WIDGET(QPushButton,    ctrl.dc.StartBtn);
     ALLOC_WIDGET(QPushButton,    ctrl.dc.StopBtn );
+    ctrl.dc.Console->setFixedHeight(200);
 
     QVBoxLayout* b = new QVBoxLayout();
     b->setContentsMargins(1,1,1,1);
     b->setSpacing(1);
+
+    QHBoxLayout* l = new QHBoxLayout();
+    l->setContentsMargins(1,1,1,1);
+    l->setSpacing(1);
+    l->addWidget(ctrl.dc.Console);
+    b->addLayout(l);
+
     b->addWidget(ctrl.dc.List);
 
     QHBoxLayout* t = new QHBoxLayout();
@@ -350,15 +363,10 @@ QWidget* MainWindow::buildWidget_DiskClone() {
     t->setSpacing(1);
     t->addWidget(new QLabel("Target Drive: "));
     t->addWidget(ctrl.dc.Target);
+    t->addStretch();
     t->addWidget(ctrl.dc.StartBtn);
     t->addWidget(ctrl.dc.StopBtn);
     b->addLayout(t);
-
-    QHBoxLayout* l = new QHBoxLayout();
-    l->setContentsMargins(1,1,1,1);
-    l->setSpacing(1); l->addStretch();
-    l->addWidget(ctrl.dc.Console);
-    b->addLayout(l);
 
     w->setLayout(b);
     return w;
@@ -376,7 +384,7 @@ QWidget* MainWindow::buildWidget_TrimDrive() {
     BUILD_WIDGET_2(ctrl.td, Console, StartBtn, StopBtn);
 }
 
-QWidget* MainWindow::buildWidget_EraseDrive() {
+QWidget* MainWindow::buildWidget_SecureWipe() {
     BUILD_WIDGET_2(ctrl.sw, Console, StartBtn, StopBtn);
 }
 
@@ -388,16 +396,17 @@ QWidget* MainWindow::buildWidget_Debug() {
 #define SHOWBTN 1
 #define HIDEBTN 0
 
+#define FRMTBTN(btn, text) do { \
+    btn->setText(text); btn->setFixedSize(90, 3 * fh); } while(0)
+
 #define ADDBTN(btn, name, box, slot, showbtn) do { \
-    btn = new QPushButton(name, this); \
-    btn->setFixedSize(90, 3 * fh); box->addWidget(btn); \
+    btn = new QPushButton(this); FRMTBTN(btn, name); box->addWidget(btn); \
     connect (btn, SIGNAL(clicked()), this, SLOT(slot())); \
     if (!showbtn) btn->hide(); } while(0)
 
 void MainWindow::initWindow()
 {
-    QFont font("Courier New", 11);
-    QFontMetrics fmtr(font);
+    QFont font("Courier New", 11); QFontMetrics fmtr(font);
     int fw = fmtr.maxWidth(), fh = fmtr.height();
 
     QHBoxLayout* layout = new QHBoxLayout();
@@ -408,17 +417,17 @@ void MainWindow::initWindow()
         QVBoxLayout* b = new QVBoxLayout();
         b->setContentsMargins(1,1,1,1);
         b->setSpacing(1);
-        ADDBTN(ctrl.ScanBtn, "Scan\nDrive", b, handleScanDrive, SHOWBTN);
+        ADDBTN(ctrl.ScanBtn, "Scan\nDrive", b,        handleScanDrive, SHOWBTN);
 
-        ADDBTN(ctrl.InfoBtn, "Drive\nInfo", b, handleViewDrive, SHOWBTN);
-        ADDBTN(ctrl.SmartBtn, "SMART\nView", b, handleViewSmart, SHOWBTN);
-        ADDBTN(ctrl.CloneBtn, "Disk\nClone", b, handleCloneDrive, SHOWBTN);
-        ADDBTN(ctrl.TrimBtn, "Optimize\nDrive", b, handleTrimDrive, SHOWBTN);
-        ADDBTN(ctrl.EraseBtn, "Secure\nWipe", b, handleEraseDrive, SHOWBTN);
-        ADDBTN(ctrl.TestBtn, "Self\nTest", b, handleSelfTest, SHOWBTN);
-        ADDBTN(ctrl.UpdateBtn, "Update\nFirmware", b, handleUpdateFw, SHOWBTN);
+        ADDBTN(ctrl.InfoBtn, "Drive\nInfo", b,        handleViewDrive, SHOWBTN);
+        ADDBTN(ctrl.SmartBtn, "SMART\nView", b,       handleViewSmart, SHOWBTN);
+        ADDBTN(ctrl.CloneBtn, "Disk\nClone", b,       handleDiskClone, SHOWBTN);
+        ADDBTN(ctrl.TrimBtn, "Optimize\nDrive", b,    handleTrimDrive, HIDEBTN);
+        ADDBTN(ctrl.EraseBtn, "Secure\nWipe", b,      handleSecureWipe,HIDEBTN);
+        ADDBTN(ctrl.TestBtn, "Self\nTest", b,         handleSelfTest,  HIDEBTN);
+        ADDBTN(ctrl.UpdateBtn, "Update\nFirmware", b, handleUpdateFw,  HIDEBTN);
         b->addStretch();
-        ADDBTN(ctrl.DebugBtn, "Debug\n", b, handleDebug, SHOWBTN);
+        ADDBTN(ctrl.DebugBtn, "Debug\n", b,           handleDebug,     SHOWBTN);
         layout->addLayout(b);
     }
 
@@ -435,14 +444,9 @@ void MainWindow::initWindow()
 
     if(1) {
         QStackedWidget* s = new QStackedWidget(this);
-        s->addWidget(buildWidget_ViewDrive());  // Drive View
-        s->addWidget(buildWidget_ViewSmart());  // SMART View
-        s->addWidget(buildWidget_DiskClone());  // Disk Clone
-        s->addWidget(buildWidget_UpdateFw());   // Fw Update
-        s->addWidget(buildWidget_TrimDrive());  // Optimize
-        s->addWidget(buildWidget_SelfTest());   // Self Test
-        s->addWidget(buildWidget_EraseDrive()); // Secure Wipe
-        s->addWidget(buildWidget_Debug());      // Debug Pane
+        #define MAP_ITEM(name, code) s->addWidget(buildWidget_##name());
+        #include "FuncList.def"
+        #undef MAP_ITEM
         s->setCurrentIndex(0);
 
         QVBoxLayout* b = new QVBoxLayout();
@@ -451,7 +455,6 @@ void MainWindow::initWindow()
 
         if (1) {
             QProgressBar* p = new QProgressBar(this);
-            QHBoxLayout* r = new QHBoxLayout();
             b->addWidget(p); ctrl.ProgBar = p;
         }
 
@@ -461,10 +464,23 @@ void MainWindow::initWindow()
 
     if (1) {
         // Connect signal handlers
-        connect(ctrl.st.Mode0Btn, SIGNAL(click()), this, SLOT(handleSelfTestMode0()));
-        connect(ctrl.st.Mode1Btn, SIGNAL(click()), this, SLOT(handleSelfTestMode1()));
-        connect(ctrl.st.Mode2Btn, SIGNAL(click()), this, SLOT(handleSelfTestMode2()));
-        connect(ctrl.st.StopBtn , SIGNAL(click()), this, SLOT(handleSelfTestStop()));
+        #define CONNECT_ITEM_1(prefix, name, func) \
+            FRMTBTN(prefix.func##Btn, #func); \
+            connect(prefix.func##Btn, SIGNAL(clicked()), this, SLOT(handle##name##func()))
+        #define CONNECT_ITEM_2(p, n, f0, f1) \
+            CONNECT_ITEM_1(p, n, f0); CONNECT_ITEM_1(p, n, f1)
+        #define CONNECT_ITEM_3(p, n, f0, f1, f2) \
+            CONNECT_ITEM_2(p, n, f0, f1); CONNECT_ITEM_1(p, n, f2)
+        #define CONNECT_ITEM_4(p, n, f0, f1, f2, f3) \
+            CONNECT_ITEM_3(p, n, f0, f1, f2); CONNECT_ITEM_1(p, n, f3)
+
+        CONNECT_ITEM_2(ctrl.dc, DiskClone, Start, Stop);
+        CONNECT_ITEM_2(ctrl.uf, UpdateFw, Start, Stop);
+        CONNECT_ITEM_2(ctrl.td, TrimDrive, Start, Stop);
+        CONNECT_ITEM_2(ctrl.sw, SecureWipe, Start, Stop);
+        CONNECT_ITEM_3(ctrl.db, Debug, Read, Fill, Stop);
+        CONNECT_ITEM_4(ctrl.st, SelfTest, Mode0, Mode1, Mode2, Stop);
+        #undef MAP_ITEM
     }
 
     setLayout(layout);
@@ -479,7 +495,7 @@ void MainWindow::initWindow()
 
 // ----------------------------------------------------------------------------
 
-void MainWindow::handleStop()
+void MainWindow::handleCommonStop()
 {
     DEF_APP_DATA();
 
@@ -493,6 +509,24 @@ void MainWindow::handleStop()
 }
 
 // ----------------------------------------------------------------------------
+
+void MainWindow::handleSelectDrive() {
+    int widx = ctrl.Stack->currentIndex();
+    #define MAP_ITEM(func, code) case code: showWidget_##func(); return;
+    switch(widx) {
+        #include "FuncList.def"
+    }
+    #undef MAP_ITEM
+}
+
+#define MAP_ITEM(funcname, viewidx) \
+void MainWindow::handle##funcname() { \
+        ctrl.Stack->setCurrentIndex(viewidx); showWidget_##funcname(); }
+#include "FuncList.def"
+#undef MAP_ITEM
+
+// ----------------------------------------------------------------------------
+
 #define RETURN_NO_DRIVE_FOUND_IF(cond) if (cond) do { \
     setLog(cs, "No drive found. Please scan drive first."); return; } while(0)
 #define RETURN_NO_SEL_DRIVE_IF(cond) if (cond) do { \
@@ -503,35 +537,6 @@ void MainWindow::handleStop()
     setLog(cs, "No target drive found. Please insert new drive."); return; } while(0)
 #define RETURN_NOT_SUPPORT_IF(cond) if (cond) do { \
     setLog(cs, "Feature not support on this drive."); return; } while(0)
-// ----------------------------------------------------------------------------
-
-void MainWindow::handleSelectDrive() {
-    int widx = ctrl.Stack->currentIndex();
-    #define MAP_ITEM(code, func) case code: func(); return;
-    switch(widx) {
-        MAP_ITEM(VIEW_DRIVE_INFO,  showWidget_ViewDrive);
-        MAP_ITEM(VIEW_SMART_INFO,  showWidget_ViewSmart);
-        MAP_ITEM(VIEW_OPTIMIZATION,showWidget_TrimDrive);
-        MAP_ITEM(VIEW_FW_UPDATE,   showWidget_UpdateFw);
-        MAP_ITEM(VIEW_SECURE_WIPE, showWidget_EraseDrive);
-        MAP_ITEM(VIEW_DISK_CLONE,  showWidget_CloneDrive);
-        MAP_ITEM(VIEW_SELF_TEST,   showWidget_SelfTest);
-    }
-}
-
-#define DEF_FUNC(handlefunc, viewidx, showfunc) \
-    void MainWindow::handlefunc() { \
-        ctrl.Stack->setCurrentIndex(viewidx); showfunc(); }
-DEF_FUNC(handleViewDrive , VIEW_DRIVE_INFO,  showWidget_ViewDrive )
-DEF_FUNC(handleViewSmart , VIEW_SMART_INFO,  showWidget_ViewSmart )
-DEF_FUNC(handleSelfTest  , VIEW_SELF_TEST,   showWidget_SelfTest  )
-DEF_FUNC(handleCloneDrive, VIEW_DISK_CLONE,  showWidget_CloneDrive)
-DEF_FUNC(handleTrimDrive , VIEW_OPTIMIZATION,showWidget_TrimDrive )
-DEF_FUNC(handleEraseDrive, VIEW_SECURE_WIPE, showWidget_EraseDrive)
-DEF_FUNC(handleUpdateFw  , VIEW_FW_UPDATE,   showWidget_UpdateFw  )
-DEF_FUNC(handleDebug     , VIEW_DEBUG,       showWidget_Debug     )
-#undef DEF_FUNC
-
 // ----------------------------------------------------------------------------
 
 void ScanDriveThreadFunc(void* param) {
@@ -597,21 +602,19 @@ void SelfTestThreadFunc(void* param) {
     StorageApi::SelfTest(cmn.drvname, 0, &cmn.progress);
 }
 
-void MainWindow::handleSelfTestMode0() {
-
-}
-
-void MainWindow::handleSelfTestMode1() {
-
-}
-
-void MainWindow::handleSelfTestMode2() {
-
-}
-
-void MainWindow::handleSelfTestStop() {
-
-}
+void MainWindow::handleSelfTestMode0() {}
+void MainWindow::handleSelfTestMode1() {}
+void MainWindow::handleSelfTestMode2()  {}
+void MainWindow::handleSelfTestStop() {}
+void MainWindow::handleUpdateFwStart() {}
+void MainWindow::handleUpdateFwStop() {}
+void MainWindow::handleTrimDriveStart() {}
+void MainWindow::handleTrimDriveStop() {}
+void MainWindow::handleSecureWipeStart() {}
+void MainWindow::handleSecureWipeStop() {}
+void MainWindow::handleDebugRead() {}
+void MainWindow::handleDebugFill() {}
+void MainWindow::handleDebugStop() {}
 
 void MainWindow::showWidget_SelfTest()
 {
@@ -683,7 +686,71 @@ void DiskCloneThreadFunc(void* param) {
     StorageApi::CloneDrive(cmn.dstname, cmn.drvname, cmn.partarr, &cmn.progress);
 }
 
-void MainWindow::showWidget_CloneDrive()
+static void FillTargetDrive(QComboBox* box, tDriveArray& darr, U32 cidx) {
+    box->clear();
+    for (U32 i = 0, maxi = darr.size(); i < maxi; i++) {
+        if (i == cidx) continue;
+        sDriveInfo& drv = darr[i];
+        stringstream sstr;
+        sstr << drv.id.model;
+        box->addItem(QString(sstr.str().c_str()));
+    }
+}
+
+#include "PartWidget.h"
+
+static void ShowDrivePartition(QListWidget* box, const sDriveInfo& drv) {
+    box->clear();
+    for (int i = 0, maxi = drv.pi.parr.size(); i < maxi; i++) {
+        const sPartition& p = drv.pi.parr[i];
+        QListWidgetItem* item = new QListWidgetItem();
+        PartWidget* pw = new PartWidget(); pw->setPart(p);
+        item->setSizeHint(pw->sizeHint());
+        box->addItem(item); box->setItemWidget(item, pw);
+    }
+}
+
+static bool GetSourcePartArray(QListWidget* box, tAddrArray& pa) {
+    pa.clear();
+    for (int i = 0, maxi = box->count(); i < maxi; i++) {
+        QListWidgetItem* item = box->item(i);
+        PartWidget* pw = (PartWidget*) box->itemWidget(item);
+        tPartAddr addr; if (!pw->getPartInfo(addr)) continue;
+        pa.push_back(addr);
+    }
+    return pa.max_size() != 0;
+}
+
+static bool GetTargetDriveInfo(QComboBox* box, string& dst) {
+    if (!box->count()) return false;
+    dst = box->currentText().toStdString();
+    return true;
+}
+
+void MainWindow::showWidget_DiskClone()
+{
+    // Show all partitions on selected drive
+
+    DEF_APP_DATA();
+    QPlainTextEdit* cs = ctrl.dc.Console;
+
+    int idx = ctrl.DrvList->currentRow();
+    int maxi = scan.darr.size();
+    RETURN_NO_DRIVE_FOUND_IF(!maxi);
+    RETURN_NO_SEL_DRIVE_IF(maxi && (idx < 0));
+    RETURN_WRONG_INDEX_IF((idx < 0) || (idx >= maxi));
+    RETURN_NO_TARGET_DRIVE_IF(maxi <= 1);
+
+    const StorageApi::sDriveInfo& drv = scan.darr[idx];
+
+    // Show list of partitions of current drive
+    ShowDrivePartition(ctrl.dc.List, drv);
+
+    // Fill Target with remaining drives
+    FillTargetDrive(ctrl.dc.Target, scan.darr, idx);
+}
+
+void MainWindow::handleDiskCloneStart()
 {
     DEF_APP_DATA();
     QPlainTextEdit* cs = ctrl.dc.Console;
@@ -698,14 +765,14 @@ void MainWindow::showWidget_CloneDrive()
     // Generate random params for DiskClone
     // In the real code, user will select these params from GUI
     const StorageApi::sDriveInfo& drv = scan.darr[idx];
-    const StorageApi::sDriveInfo& dst = scan.darr[(idx + 1) % maxi];
-    StorageApi::tAddrArray parts; GetRamdomParts(drv, parts);
+    tAddrArray pa;  GetSourcePartArray(ctrl.dc.List, pa);
+    string dstname; GetTargetDriveInfo(ctrl.dc.Target, dstname);
 
     // Now, clone partitions in parr to new target drive
     setLog(cs, "Cloning Drive " + QString(drv.name.c_str()));
 
     enableGui(false);
-    cmn.initCloneParam(drv.name, parts, dst.name);
+    cmn.initCloneParam(drv.name, pa, dstname);
 
     if (1) {
         // Should not dump message in worker thread, so put it here
@@ -726,11 +793,16 @@ void MainWindow::showWidget_CloneDrive()
 
     std::stringstream sstr;
     std::string info = *const_cast<std::string*>(&cmn.progress.info);
-    sstr << "Optimizing Drive Done! Return Code: "
+    sstr << "Clone Drive Done! Return Code: "
          << StorageApi::ToString(cmn.progress.rval) << std::endl
          << "Report: " << std::endl << info;
-    setLog(cs, QString(sstr.str().c_str()));
+    appendLog(cs, QString(sstr.str().c_str()));
     enableGui(true);
+}
+
+void MainWindow::handleDiskCloneStop()
+{
+    handleCommonStop();
 }
 
 // ----------------------------------------------------------------------------
@@ -775,7 +847,7 @@ void SecureEraseThreadFunc(void* param) {
     StorageApi::SecureErase(cmn.drvname, &cmn.progress);
 }
 
-void MainWindow::showWidget_EraseDrive()
+void MainWindow::showWidget_SecureWipe()
 {
     DEF_APP_DATA();
     QPlainTextEdit* cs = ctrl.sw.Console;

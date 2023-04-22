@@ -70,7 +70,7 @@ struct sIDENTIFY
     std::string DeviceModel;
     std::string SerialNumber;
     std::string FirmwareVersion;
-    double UserCapacity;    // User capacity in GB ( not raw capacity )
+    U64 UserCapacity;    // User capacity in sector
 
     U8 DriveIndex;
 

@@ -25,14 +25,9 @@ typedef void (*tWorkerFunc)(void*);
 
 // Widget Positions
 enum eViewCode {
-    VIEW_DRIVE_INFO,
-    VIEW_SMART_INFO,
-    VIEW_OPTIMIZATION,
-    VIEW_FW_UPDATE,
-    VIEW_SECURE_WIPE,
-    VIEW_DISK_CLONE,
-    VIEW_SELF_TEST,
-    VIEW_DEBUG,
+    #define MAP_ITEM(name, code) code,
+    #include "FuncList.def"
+    #undef MAP_ITEM
 };
 
 class MainWindow : public QDialog
@@ -129,52 +124,53 @@ public:
     void waitProcessing(volatile StorageApi::sProgress& prog);
 
 public slots:
-    // Debug Slots
-    void handleStop();
-    void handleReadDrive();
-    void handleFillDrive();
-
     // Common Slots
-    void handleSelectDrive();
+    void handleScanDrive();   // Press ScanBtn
+    void handleSelectDrive(); // Select one item in the list
 
-    void handleScanDrive();
-    void handleViewDrive();
-    void handleViewSmart();
-    void handleSelfTest();
-    void handleCloneDrive();
-    void handleTrimDrive();
-    void handleEraseDrive();
-    void handleUpdateFw();
-    void handleDebug();
+    #define MAP_ITEM(name, index) void handle##name();
+    MAP_ITEM(ViewDrive , VIEW_DRIVE_INFO  )
+    MAP_ITEM(ViewSmart , VIEW_SMART_INFO  )
+    MAP_ITEM(SelfTest  , VIEW_SELF_TEST   )
+    MAP_ITEM(DiskClone , VIEW_DISK_CLONE  )
+    MAP_ITEM(TrimDrive , VIEW_OPTIMIZATION)
+    MAP_ITEM(SecureWipe, VIEW_SECURE_WIPE )
+    MAP_ITEM(UpdateFw  , VIEW_FW_UPDATE   )
+    MAP_ITEM(Debug     , VIEW_DEBUG       )
+    #undef MAP_ITEM
 
-public:
-    void showWidget_ViewDrive();
-    void showWidget_ViewSmart();
-    void showWidget_SelfTest();
-    void showWidget_CloneDrive();
-    void showWidget_TrimDrive();
-    void showWidget_EraseDrive();
-    void showWidget_UpdateFw();
-    void showWidget_Debug();
-
-public:
-    QWidget* buildWidget_Common(
-        QPlainTextEdit* text, QPushButton* btn[], int cnt);
-
-    QWidget* buildWidget_ViewDrive();
-    QWidget* buildWidget_ViewSmart();
-    QWidget* buildWidget_DiskClone();
-    QWidget* buildWidget_UpdateFw();
-    QWidget* buildWidget_TrimDrive();
-    QWidget* buildWidget_SelfTest();
-    QWidget* buildWidget_EraseDrive();
-    QWidget* buildWidget_Debug();
-
-public slots:
+    // Specific operation
     void handleSelfTestMode0();
     void handleSelfTestMode1();
     void handleSelfTestMode2();
     void handleSelfTestStop();
+    void handleUpdateFwStart();
+    void handleUpdateFwStop();
+    void handleTrimDriveStart();
+    void handleTrimDriveStop();
+    void handleSecureWipeStart();
+    void handleSecureWipeStop();
+    void handleDiskCloneStart();
+    void handleDiskCloneStop();
+    void handleDebugRead();
+    void handleDebugFill();
+    void handleDebugStop();
+
+    // Redundant (old code)
+    void handleCommonStop();
+    void handleReadDrive();
+    void handleFillDrive();
+
+public:
+    // Build content of specific widget
+    QWidget* buildWidget_Common(
+        QPlainTextEdit* text, QPushButton* btn[], int cnt);
+
+    #define MAP_ITEM(funcname, index) \
+            QWidget* buildWidget_##funcname(); \
+            void showWidget_##funcname();
+    #include "FuncList.def"
+    #undef MAP_ITEM
 };
 
 #endif // MAINWINDOW_H

@@ -37,15 +37,15 @@ MAP_ITEM(SMA_TEMP_WARNING           , 0x0100 | 141,  true, "Warning_Composite_Te
 MAP_ITEM(SMA_TEMP_CRITICAL          , 0x0100 | 142,  true, "Critical_Composite_Temp_Time","")
 MAP_ITEM(SMA_MEDIA_ERRORS           , 0x0100 | 151,  true, "Media_Errors"                ,"")
 MAP_ITEM(SMA_ERROR_LOG_COUNT        , 0x0100 | 152,  true, "Error_Info_Log_Entry_Count"  ,"")
-MAP_ITEM(SMA_CTRL_BUSY_TIME         , 0x0100 | 153,  true, "Controller_Busy_Time"        ,"")
+MAP_ITEM(SMA_CTRL_BUSY_TIME         , 0x0100 | 153,  true, "Controller_Busy_Time"        ,"") // minute
 MAP_ITEM(SMA_HOST_CMD_READ          , 0x0100 | 154,  true, "Host_Read_Commands"          ,"")
 MAP_ITEM(SMA_HOST_CMD_WRITTEN       , 0x0100 | 155,  true, "Host_Written_Commands"       ,"")
-MAP_ITEM(SMA_DATA_UNIT_READ         , 0x0100 | 121,  true, "Data_Unit_Read"              ,"")
-MAP_ITEM(SMA_DATA_UNIT_WRITTEN      , 0x0100 | 122,  true, "Data_Unit_Written"           ,"")
+MAP_ITEM(SMA_DATA_UNIT_READ         , 0x0100 | 121,  true, "Data_Unit_Read"              ,"") // 1000 * sector
+MAP_ITEM(SMA_DATA_UNIT_WRITTEN      , 0x0100 | 122,  true, "Data_Unit_Written"           ,"") // 1000 * sector
 MAP_ITEM(SMA_POWER_CYCLE            , 0x0100 | 123,  true, "Power_Cycle"                 ,"")
 MAP_ITEM(SMA_NVME_POWER_ON_HOURS    , 0x0100 | 124,  true, "Power_On_Hours"              ,"")
 MAP_ITEM(SMA_UNSAFE_SHUTDOWNS       , 0x0100 | 125,  true, "Unsafe_Shutdowns"            ,"")
-MAP_ITEM(SMA_COMPOSITE_TEMP         , 0x0100 | 126,  true, "Composite_Temperature"       ,"")
-MAP_ITEM(SMA_SPARE_PERCENTAGE       , 0x0100 | 127,  true, "Available_Spare_Percentage"  ,"")
+MAP_ITEM(SMA_COMPOSITE_TEMP         , 0x0100 | 126,  true, "Composite_Temperature"       ,"") // Kalvin
+MAP_ITEM(SMA_SPARE_PERCENTAGE       , 0x0100 | 127,  true, "Available_Spare_Percentage"  ,"") // 0->100
 MAP_ITEM(SMA_SPARE_THRESHOLD        , 0x0100 | 128,  true, "Available_Spare_Threshold"   ,"")
-MAP_ITEM(SMA_PERCENTAGE_USED        , 0x0100 | 129,  true, "Percentage_Used"             ,"")
+MAP_ITEM(SMA_PERCENTAGE_USED        , 0x0100 | 129,  true, "Percentage_Used"             ,"") // 0->100 -> Health = 100 - Used

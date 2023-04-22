@@ -278,9 +278,9 @@ STR StorageApi::ToString(const StorageApi::sPartition& pt, U32 indent) {
     sstr << prefix << "Partition: ";
     // MAP_ITEM(20, "Name" , pt.name, "");
     MAP_ITEM( 0, "Idx"  , pt.index, "");
-    MAP_ITEM(14, "LBA"  , pt.addr.first, "");
-    MAP_ITEM(14, "Count", pt.addr.second, "sectors");
-    MAP_ITEM( 8, "Size" , pt.cap, "GB");
+    MAP_ITEM(14, "LBA"  , (pt.addr.first >> 9), "");
+    MAP_ITEM(14, "Count", (pt.addr.second >> 9), "sectors");
+    MAP_ITEM( 8, "Size" , (pt.cap >> 21), "GB");
     #undef MAP_ITEM
     return sstr.str();
 }
@@ -301,9 +301,9 @@ WSTR StorageApi::ToWideString(const StorageApi::sPartition& pt, U32 indent) {
     sstr << prefix << L"Partition: ";
     MAP_ITEM(30, L"Name" , pt.name, "");
     MAP_ITEM( 0, L"Idx"  , pt.index, "");
-    MAP_ITEM(14, L"LBA"  , pt.addr.first, "");
-    MAP_ITEM(14, L"Count", pt.addr.second, "sectors");
-    MAP_ITEM( 8, L"Size" , pt.cap, "GB");
+    MAP_ITEM(14, L"LBA"  , (pt.addr.first >> 9), "");
+    MAP_ITEM(14, L"Count", (pt.addr.second >> 9), "sectors");
+    MAP_ITEM( 8, L"Size" , (pt.cap >> 21), "GB");
     #undef MAP_ITEM
     return sstr.str();
 }

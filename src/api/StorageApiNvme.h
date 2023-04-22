@@ -26,8 +26,6 @@ typedef std::vector<tNsData> tNsDataArr;
 typedef std::vector<tHealthLog> tHealthLogArr;
 
 static eRetCode ConvertIdentify(const tCtrlData& ctrl, const tNsDataArr& nsarr, sIdentify& id) {
-    uint64_t dl, dh; // temporary values
-
     if (1) {
         #define MAP_ITEM(sname, dname) do { \
             TMPBUFFER(buf); \
@@ -41,10 +39,8 @@ static eRetCode ConvertIdentify(const tCtrlData& ctrl, const tNsDataArr& nsarr, 
     }
 
     if (1) {
-        F64 cap = 0;
-        for (U32 i = 0, maxi = nsarr.size(); i < maxi; i++) {
-            cap += (nsarr[i].NSZE * 100 >> 21) / 100.0; // Capacity in GB
-        }
+        U64 cap = 0; // Capacity in logical block(aka sector)
+        for (U32 i = 0, maxi = nsarr.size(); i < maxi; i++) cap += nsarr[i].NSZE;
         id.cap = cap;
     }
 
@@ -141,7 +137,13 @@ static eRetCode ScanDrive_NvmeBus(sPHYDRVINFO& phy, U32 index, bool rsm, sDriveI
         MAP_ITEM(temp, SMA_COMPOSITE_TEMP);
         MAP_ITEM(tread, SMA_DATA_UNIT_READ);
         MAP_ITEM(twrtn, SMA_DATA_UNIT_WRITTEN);
+        MAP_ITEM(health, SMA_PERCENTAGE_USED);
         #undef MAP_ITEM
+
+        di.temp = di.temp - 273; // Kalvin -> Celsius
+        di.tread = di.tread * 1000; // unit -> sector
+        di.twrtn = di.twrtn * 1000; // unit -> sector
+        di.health = (di.health > 100) ? 0 : (100 - di.health); // remaining percentage
     }
 
     UPDATE_PROGRESS(p, 6);
