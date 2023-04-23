@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stddef.h>
 #include "winioctl.h"
+#include <ntddscsi.h>
 
 using namespace std;
 
@@ -430,3 +431,356 @@ exit:
 
     return result;
 }
+
+
+
+BOOL NvmeUtil::IdentifyActiveNSIDList(HANDLE hDevice, PNVME_IDENTIFY_ACTIVE_NAMESPACE_LIST pNsidList) {
+    BOOL  result = FALSE;
+    PVOID buffer = NULL;
+    ULONG bufferLength = 0;
+    ULONG returnedLength = 0;
+
+    PSTORAGE_PROPERTY_QUERY query = NULL;
+    PSTORAGE_PROTOCOL_SPECIFIC_DATA protocolData = NULL;
+    PSTORAGE_PROTOCOL_DATA_DESCRIPTOR protocolDataDescr = NULL;
+
+    // Allocate buffer for use.
+    bufferLength = offsetof(STORAGE_PROPERTY_QUERY, AdditionalParameters) +
+                   sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA) +
+                   sizeof(NVME_IDENTIFY_ACTIVE_NAMESPACE_LIST);
+    buffer = malloc(bufferLength);
+
+    if (buffer == NULL) {
+         printf("IdentifyActiveNSIDList: allocate buffer failed.\n");
+        goto exit;
+    }
+
+    // Initialize query data structure to get Identify Active Namespace ID list.
+    ZeroMemory(buffer, bufferLength);
+
+    query = (PSTORAGE_PROPERTY_QUERY)buffer;
+    protocolDataDescr = (PSTORAGE_PROTOCOL_DATA_DESCRIPTOR)buffer;
+    protocolData = (PSTORAGE_PROTOCOL_SPECIFIC_DATA)query->AdditionalParameters;
+
+    query->PropertyId = StorageDeviceProtocolSpecificProperty;
+    query->QueryType = PropertyStandardQuery;
+
+    protocolData->ProtocolType = ProtocolTypeNvme;
+    protocolData->DataType = NVMeDataTypeIdentify;
+    protocolData->ProtocolDataRequestValue =
+        NVME_IDENTIFY_CNS_ACTIVE_NAMESPACES;
+    protocolData->ProtocolDataRequestSubValue = 0;  // to retrieve all IDs
+    protocolData->ProtocolDataOffset = sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA);
+    protocolData->ProtocolDataLength = sizeof(NVME_IDENTIFY_ACTIVE_NAMESPACE_LIST);
+
+    // Send request down.
+    result = DeviceIoControl(hDevice, IOCTL_STORAGE_QUERY_PROPERTY,
+                                    buffer, bufferLength, buffer, bufferLength,
+                                    &returnedLength, NULL);
+
+    if (!result) goto exit;
+
+    //
+    // Validate the returned data.
+    //
+    if ((protocolDataDescr->Version !=
+         sizeof(STORAGE_PROTOCOL_DATA_DESCRIPTOR)) ||
+        (protocolDataDescr->Size != sizeof(STORAGE_PROTOCOL_DATA_DESCRIPTOR))) {
+        printf("IdentifyActiveNSIDList: Data Descriptor Header is not valid.\n");
+        result = FALSE;
+        goto exit;
+        goto exit;
+    }
+
+    protocolData = &protocolDataDescr->ProtocolSpecificData;
+
+    if ((protocolData->ProtocolDataOffset >
+         sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA)) ||
+        (protocolData->ProtocolDataLength < sizeof(NVME_IDENTIFY_ACTIVE_NAMESPACE_LIST))) {
+        printf("IdentifyActiveNSIDList: ProtocolData Offset/Length is not valid.\n");
+        result = FALSE;
+        goto exit;
+    }
+
+    memcpy(pNsidList, (PCHAR)protocolData + protocolData->ProtocolDataOffset, sizeof(NVME_CHANGED_NAMESPACE_LIST_LOG));
+
+    result = TRUE;
+
+exit:
+
+    if (buffer != NULL) {
+        free(buffer);
+    }
+
+    return result;
+}
+
+BOOL NvmeUtil::GetSCSIAAddress(HANDLE hDevice, PSCSI_ADDRESS pScsiAddress)
+{
+    BOOL result = FALSE;
+    ULONG returnedLength = 0;
+    if (pScsiAddress && hDevice != INVALID_HANDLE_VALUE)
+    {
+
+        memset(pScsiAddress, 0, sizeof(SCSI_ADDRESS));
+        result = DeviceIoControl(hDevice, IOCTL_SCSI_GET_ADDRESS, NULL, 0, pScsiAddress, sizeof(SCSI_ADDRESS), &returnedLength, NULL);
+        if (!result)
+        {
+            pScsiAddress->PortNumber = UINT8_MAX;
+            pScsiAddress->PathId = UINT8_MAX;
+            pScsiAddress->TargetId = UINT8_MAX;
+            pScsiAddress->Lun = UINT8_MAX;
+            result = FALSE;
+        }
+    }
+
+    return result;
+}
+
+static BOOL sendSCSIPassThrough(tScsiContext *scsiCtx)
+{
+    BOOL          ret = FALSE;
+    BOOL          success = FALSE;
+    ULONG         returned_data = 0;
+    tScsiPassThroughIOStruct* sptdioDB = (tScsiPassThroughIOStruct*) malloc(sizeof(tScsiPassThroughIOStruct) + scsiCtx->dataLength);
+    if (!sptdioDB) {
+        return FALSE;
+    }
+
+
+    memset(sptdioDB, 0, sizeof(tScsiPassThroughIOStruct) + scsiCtx->dataLength);
+
+    sptdioDB->scsiPassthrough.Length = sizeof(SCSI_PASS_THROUGH);
+    sptdioDB->scsiPassthrough.PathId = scsiCtx->scsiAddr.PathId;
+    sptdioDB->scsiPassthrough.TargetId = scsiCtx->scsiAddr.TargetId;
+    sptdioDB->scsiPassthrough.Lun = scsiCtx->scsiAddr.Lun;
+    sptdioDB->scsiPassthrough.CdbLength = scsiCtx->cdbLength;
+    sptdioDB->scsiPassthrough.ScsiStatus = 255;
+    sptdioDB->scsiPassthrough.SenseInfoLength = C_CAST(UCHAR, scsiCtx->senseDataSize);
+    ZeroMemory(sptdioDB->senseBuffer, SPC3_SENSE_LEN);
+
+    switch (scsiCtx->direction)
+    {
+    case XFER_DATA_IN:
+        sptdioDB->scsiPassthrough.DataIn = SCSI_IOCTL_DATA_IN;
+        sptdioDB->scsiPassthrough.DataTransferLength = scsiCtx->dataLength;
+        sptdioDB->scsiPassthrough.DataBufferOffset = offsetof(tScsiPassThroughIOStruct, dataBuffer);
+        break;
+    case XFER_DATA_OUT:
+        sptdioDB->scsiPassthrough.DataIn = SCSI_IOCTL_DATA_OUT;
+        sptdioDB->scsiPassthrough.DataTransferLength = scsiCtx->dataLength;
+        sptdioDB->scsiPassthrough.DataBufferOffset = offsetof(tScsiPassThroughIOStruct, dataBuffer);
+        break;
+    case XFER_NO_DATA:
+        sptdioDB->scsiPassthrough.DataIn = SCSI_IOCTL_DATA_UNSPECIFIED;
+        sptdioDB->scsiPassthrough.DataTransferLength = 0;
+        sptdioDB->scsiPassthrough.DataBufferOffset = offsetof(tScsiPassThroughIOStruct, dataBuffer);
+        break;
+    default:
+        return FALSE;
+
+    }
+
+    if (scsiCtx->timeout != 0) {
+        sptdioDB->scsiPassthrough.TimeOutValue = scsiCtx->timeout;
+    }
+    else {
+        sptdioDB->scsiPassthrough.TimeOutValue = 15;
+    }
+
+
+    sptdioDB->scsiPassthrough.SenseInfoOffset = offsetof(tScsiPassThroughIOStruct, senseBuffer);
+    memcpy(sptdioDB->scsiPassthrough.Cdb, scsiCtx->cdb, sizeof(sptdioDB->scsiPassthrough.Cdb));
+
+    //clear any cached errors before we try to send the command
+    SetLastError(ERROR_SUCCESS);
+    scsiCtx->lastError = 0;
+
+    DWORD scsiPassThroughInLength = sizeof(tScsiPassThroughIOStruct);
+    DWORD scsiPassThroughOutLength = sizeof(tScsiPassThroughIOStruct);
+    switch (scsiCtx->direction) {
+    case XFER_DATA_IN:
+        scsiPassThroughOutLength += scsiCtx->dataLength;
+        break;
+    case XFER_DATA_OUT:
+        if (scsiCtx->pdata) {
+            memcpy(sptdioDB->dataBuffer, scsiCtx->pdata, scsiCtx->dataLength);
+        }
+        scsiPassThroughInLength += scsiCtx->dataLength;
+        break;
+    default:
+        break;
+    }
+
+    success = DeviceIoControl(scsiCtx->hDevice,
+                              IOCTL_SCSI_PASS_THROUGH,
+                              &sptdioDB->scsiPassthrough,
+                              scsiPassThroughInLength,
+                              &sptdioDB->scsiPassthrough,
+                              scsiPassThroughOutLength,
+                              &returned_data,
+                              NULL);
+    scsiCtx->lastError = GetLastError();
+
+    if (success) {
+        ret = TRUE;
+        if (scsiCtx->pdata && scsiCtx->direction == XFER_DATA_IN) {
+            memcpy(scsiCtx->pdata, sptdioDB->dataBuffer, scsiCtx->dataLength);
+        }
+    } else {
+        ret = FALSE;
+    }
+    scsiCtx->returnStatus.senseKey = sptdioDB->scsiPassthrough.ScsiStatus;
+
+    // Any sense data?
+    if (scsiCtx->psense != NULL && scsiCtx->senseDataSize > 0) {
+        memcpy(scsiCtx->psense, sptdioDB->senseBuffer, M_Min(sptdioDB->scsiPassthrough.SenseInfoLength, scsiCtx->senseDataSize));
+    }
+
+    if (scsiCtx->psense != NULL) {
+        scsiCtx->returnStatus.format = scsiCtx->psense[0];
+        switch (scsiCtx->returnStatus.format & 0x7F) {
+        case SCSI_SENSE_CUR_INFO_FIXED:
+        case SCSI_SENSE_DEFER_ERR_FIXED:
+            scsiCtx->returnStatus.senseKey = scsiCtx->psense[2] & 0x0F;
+            scsiCtx->returnStatus.asc = scsiCtx->psense[12];
+            scsiCtx->returnStatus.ascq = scsiCtx->psense[13];
+            break;
+        case SCSI_SENSE_CUR_INFO_DESC:
+        case SCSI_SENSE_DEFER_ERR_DESC:
+            scsiCtx->returnStatus.senseKey = scsiCtx->psense[1] & 0x0F;
+            scsiCtx->returnStatus.asc = scsiCtx->psense[2];
+            scsiCtx->returnStatus.ascq = scsiCtx->psense[3];
+            break;
+        }
+    }
+
+    if (NULL != sptdioDB) {
+        free(sptdioDB);
+    }
+
+    return ret;
+}
+
+
+static BOOL scsiSendCdb(tScsiContext *scsiCtx, uint8_t *cdb, eCDBLen cdbLen, uint8_t *pdata, uint32_t dataLen, eDataTransferDirection dataDirection, uint8_t *senseData, uint32_t senseDataLen, uint32_t timeoutSeconds)
+{
+    BOOL ret = FALSE;
+
+    uint8_t *senseBuffer = senseData;
+    if (!senseBuffer || senseDataLen == 0) {
+        senseBuffer = scsiCtx->lastCommandSenseData;
+        senseDataLen = SPC3_SENSE_LEN;
+    } else {
+        memset(senseBuffer, 0, senseDataLen);
+    }
+    //check a couple of the parameters before continuing
+    if (!scsiCtx) {
+        perror("context struct is NULL!");
+        return FALSE;
+    }
+    if (!cdb) {
+        perror("cdb array is NULL!");
+        return FALSE;
+    }
+    if (cdbLen == CDB_LEN_UNKNOWN) {
+        perror("Invalid CDB length specified!");
+        return FALSE;
+    }
+    if (!pdata && dataLen != 0) {
+        perror("Datalen must be set to 0 when pdata is NULL");
+        return FALSE;
+    }
+
+    //set up the context
+    scsiCtx->psense = senseBuffer;
+    scsiCtx->senseDataSize = senseDataLen;
+    memcpy(&scsiCtx->cdb[0], &cdb[0], cdbLen);
+    scsiCtx->cdbLength = cdbLen;
+    scsiCtx->direction = dataDirection;
+    scsiCtx->pdata = pdata;
+    scsiCtx->dataLength = dataLen;
+    ret = sendSCSIPassThrough(scsiCtx);
+
+    if (senseData && senseDataLen > 0 && senseData != scsiCtx->lastCommandSenseData) {
+        memcpy(scsiCtx->lastCommandSenseData, senseBuffer, M_Min(SPC3_SENSE_LEN, senseDataLen));
+    }
+
+    return ret;
+}
+
+
+BOOL NvmeUtil::ScsiReportLuns(tScsiContext *scsiCtx, uint8_t selectReport, uint32_t allocationLength, uint8_t *ptrData) {
+    BOOL       result = FALSE;
+    uint8_t   cdb[CDB_LEN_12] = { 0 };
+
+    // Set up the CDB.
+    cdb[SCSI_OPERATION_CODE] = REPORT_LUNS_CMD;
+    cdb[1] = RESERVED;
+    cdb[2] = selectReport;
+    cdb[3] = RESERVED;
+    cdb[4] = RESERVED;
+    cdb[5] = RESERVED;
+    cdb[6] = M_Byte(allocationLength, 3);
+    cdb[7] = M_Byte(allocationLength, 2);
+    cdb[8] = M_Byte(allocationLength, 1);
+    cdb[9] = M_Byte(allocationLength, 0);
+    cdb[10] = RESERVED;
+    cdb[11] = 0;//control
+
+    //send the command
+    if (allocationLength > 0) {
+        result = scsiSendCdb(scsiCtx, &cdb[0], (eCDBLen)sizeof(cdb), ptrData, allocationLength, XFER_DATA_IN, scsiCtx->lastCommandSenseData, SPC3_SENSE_LEN, 15);
+    } else {
+        result = scsiSendCdb(scsiCtx, &cdb[0], (eCDBLen)sizeof(cdb), NULL, 0, XFER_NO_DATA, scsiCtx->lastCommandSenseData, SPC3_SENSE_LEN, 15);
+    }
+
+    return result;
+}
+
+
+BOOL NvmeUtil::ScsiSanitizeCmd(tScsiContext *scsiCtx, eScsiSanitizeType sanitizeType, bool immediate, bool znr, bool ause, uint16_t parameterListLength, uint8_t *ptrData)
+{
+    BOOL       result       = FALSE;
+    uint8_t   cdb[CDB_LEN_10]       = { 0 };
+    eDataTransferDirection dataDir = XFER_NO_DATA;
+
+    memset(scsiCtx->lastCommandSenseData, 0, scsiCtx->senseDataSize);
+
+
+    cdb[SCSI_OPERATION_CODE] = SANITIZE_CMD;
+    cdb[1] = sanitizeType & 0x1F;
+    if (immediate) {
+        cdb[1] |= M_BitN(7);
+    }
+    if (znr) {
+        cdb[1] |= M_BitN(6);
+    }
+    if (ause)
+    {
+        cdb[1] |= M_BitN(5);
+    }
+    cdb[2] = RESERVED;
+    cdb[3] = RESERVED;
+    cdb[4] = RESERVED;
+    cdb[5] = RESERVED;
+    cdb[6] = RESERVED;
+    //parameter list length
+    cdb[7] = M_Byte(parameterListLength, 1);
+    cdb[8] = M_Byte(parameterListLength, 0);
+
+    switch (sanitizeType) {
+    case SCSI_SANITIZE_OVERWRITE:
+        dataDir = XFER_DATA_OUT;
+        break;
+    default:
+        dataDir = XFER_NO_DATA;
+        break;
+    }
+
+    result = scsiSendCdb(scsiCtx, &cdb[0], (eCDBLen)sizeof(cdb), ptrData, parameterListLength, dataDir, scsiCtx->lastCommandSenseData, scsiCtx->senseDataSize, 15);
+
+    return result;
+}
+
+

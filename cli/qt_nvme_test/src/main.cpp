@@ -1,9 +1,45 @@
 #include "StdHeader.h"
 #include "DeviceMgr.h"
 #include "NvmeUtil.h"
+#include<iostream>
+#include <stdlib.h>
+#include <stddef.h>
+#include <tchar.h>
+#include <strsafe.h>
+#include <io.h>
+#include <lmcons.h>
 
 #define DRIVENAME "\\\\.\\PhysicalDrive0"
-#include<iostream>
+
+
+void *calloc_aligned(size_t num, size_t size, size_t alignment)
+{
+    //call malloc aligned and memset
+    void *zeroedMem = NULL;
+    size_t numSize = num * size;
+    if (numSize)
+    {
+        zeroedMem = _aligned_malloc(numSize, alignment);
+
+        if (zeroedMem)
+        {
+            memset(zeroedMem, 0, numSize);
+        }
+    }
+    return zeroedMem;
+}
+
+
+void print_Windows_Error_To_Screen(unsigned int windowsError) {
+    TCHAR *windowsErrorString = NULL;
+    //Originally used: MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT)
+    //switched to MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US) to keep output consistent with all other verbose output.-TJE
+    FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+                  NULL, windowsError, MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US), C_CAST(TCHAR*, &windowsErrorString), 0, NULL);
+    //This cast is necessary to tell the Windows API to allocate the string, but it is necessary. Without it, this will not work.
+    _tprintf_s(TEXT("%u - %s\n"), windowsError, windowsErrorString);
+    LocalFree(windowsErrorString);
+}
 
 void identifyNamespace(HANDLE hHandle) {
     std::cout << "-----Identify Namespace:------\n";
@@ -47,6 +83,19 @@ void identifyController(HANDLE hHandle) {
             buf[8] = '\0';
             std::cout << "FW Revision:" << buf << std::endl;
         }
+
+
+
+        std::cout << "fromat.FormatApplyToAll:" << (unsigned int)controllerData.FNA.FormatApplyToAll << std::endl;
+        std::cout << "fromat.SecureEraseApplyToAll:" << (unsigned int)controllerData.FNA.SecureEraseApplyToAll << std::endl;
+        std::cout << "fromat.CryptographicEraseSupported:" << (unsigned int)controllerData.FNA.CryptographicEraseSupported << std::endl;
+        std::cout << "fromat.FormatSupportNSIDAllF:" << (unsigned int)controllerData.FNA.FormatSupportNSIDAllF << std::endl;
+
+        std::cout << "SANICAP.CryptoErase:" << (unsigned int)controllerData.SANICAP.CryptoErase << std::endl;
+        std::cout << "SANICAP.BlockErase:" << (unsigned int)controllerData.SANICAP.BlockErase << std::endl;
+        std::cout << "SANICAP.Overwrite:" << (unsigned int)controllerData.SANICAP.Overwrite << std::endl;
+        std::cout << "SANICAP.NDI:" << (unsigned int)controllerData.SANICAP.NDI << std::endl;
+
     }
     else {
         std::cout << "Failure to read controller identify" << std::endl;
@@ -113,6 +162,72 @@ void doSelftest(HANDLE hHandle) {
     }
 }
 
+// NOTE: Not work now - it always print same NSZE of controller identify data
+void identifyNSIDList(HANDLE hHandle) {
+    std::cout << "\n-----List all NSID listt:------\n";
+    NVME_IDENTIFY_ACTIVE_NAMESPACE_LIST nsidList;
+    ZeroMemory(&nsidList, sizeof(NVME_IDENTIFY_ACTIVE_NAMESPACE_LIST));
+    if(NvmeUtil::IdentifyActiveNSIDList(hHandle, &nsidList)) {
+
+        for (int i = 0; i < 1024; i++) {
+            if (nsidList.NSID[i]) {
+                printf("%d\n", nsidList.NSID[i]);
+            } else {
+                break;
+            }
+        }
+        printf("[I] === Active Namespace ID list end ===\n");
+
+    } else {
+        std::cout << "===> Fail to read NSID List" << std::endl;
+        return;
+    }
+}
+
+// same identifyNSIDList() - list all active NSIDs via SCSI passthrough
+void reportLuns(HANDLE hHandle) {
+    uint32_t reportLunsDataSize = 8 + 50 *8; // Be carefully with this value ,
+                                            // not sure why if we increase or reduce this will break the DeviceIOControl Function
+    uint8_t* reportLunsData =  C_CAST(uint8_t*, malloc(reportLunsDataSize));
+    uint32_t dataLength = 40;
+    uint8_t* ptrData =  C_CAST(uint8_t*,  calloc_aligned(dataLength, sizeof(uint8_t), 4));
+
+    std::cout << "\n-----List all NSID listt:------\n";
+
+    tScsiContext * scsiContext =  (tScsiContext *) malloc(sizeof(tScsiContext));
+    scsiContext->hDevice = hHandle;
+    ZeroMemory(ptrData,  dataLength * 4);
+
+    if (!NvmeUtil::GetSCSIAAddress(hHandle, &scsiContext->scsiAddr)) {
+        std::cout << "Failed to get GetSCSIAAddress" << std::endl;
+        return;
+    }
+
+    if (TRUE == NvmeUtil::ScsiReportLuns(scsiContext, 0, reportLunsDataSize, reportLunsData)) {
+            uint32_t lunListLength = M_BytesTo4ByteValue(reportLunsData[0], reportLunsData[1], reportLunsData[2], reportLunsData[3]);
+            for (uint32_t lunOffset = 8, nsidOffset = 0; lunOffset < (8 + lunListLength) && nsidOffset < dataLength && lunOffset < reportLunsDataSize; lunOffset += 8)
+            {
+                uint64_t lun = M_BytesTo8ByteValue(reportLunsData[lunOffset + 0], reportLunsData[lunOffset + 1], reportLunsData[lunOffset + 2], reportLunsData[lunOffset + 3], reportLunsData[lunOffset + 4], reportLunsData[lunOffset + 5], reportLunsData[lunOffset + 6], reportLunsData[lunOffset + 7]);
+                {
+                    //nvme uses little endian, so get this correct!
+                    ptrData[nsidOffset + 0] = M_Byte((lun + 1), 3);
+                    ptrData[nsidOffset + 1] = M_Byte((lun + 1) ,2);
+                    ptrData[nsidOffset + 2] = M_Byte((lun + 1) ,1);
+                    ptrData[nsidOffset + 3] =M_Byte((lun + 1) ,0);
+                    printf("NSID : %d\n", *((uint32_t*) &ptrData[nsidOffset]) + 1);
+                    nsidOffset += 4;
+
+                }
+            }
+    } else {
+            std::cout << "===> Fail to read NSID List :";
+            print_Windows_Error_To_Screen(scsiContext->lastError);
+
+    }
+
+
+    free(reportLunsData);
+}
 
 int main(int argc, char** argv) {
     tHdl iHandle;
@@ -126,11 +241,13 @@ int main(int argc, char** argv) {
 
     hHandle = (HANDLE)iHandle;
 
-    identifyNamespace(hHandle);
-    identifyController(hHandle);
-    getHealthInfoLog(hHandle);
-    doSelftest(hHandle);
+    //identifyNamespace(hHandle);
+    //identifyController(hHandle);
+    //getHealthInfoLog(hHandle);
+    //doSelftest(hHandle);
+    //identifyNSIDList(hHandle);
 
+    reportLuns(hHandle);
 
     if (hHandle != INVALID_HANDLE_VALUE) {
         DeviceMgr::CloseDevice(iHandle);
