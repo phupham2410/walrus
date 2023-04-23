@@ -14,8 +14,7 @@
 /* ======================== Windows-related items ====================== */
 /* ===================================================================== */
 
-// Adding define from latest winsdk's winioctl
-// Mingw is not yet up to date
+// Redefine in case of Old MINGW SDK is being used
 #ifndef STORAGE_PROTOCOL_COMMAND
 //
 // Parameter for IOCTL_STORAGE_PROTOCOL_COMMAND
@@ -87,7 +86,52 @@ typedef struct _STORAGE_PROTOCOL_COMMAND {
 #define STORAGE_PROTOCOL_SPECIFIC_NVME_NVM_COMMAND      0x02
 #endif
 
+
+// Redefine in case of Old MINGW SDK is being used
 #ifndef SCSI_PASS_THROUGH_EX
+#define IOCTL_SCSI_PASS_THROUGH_EX          CTL_CODE(IOCTL_SCSI_BASE, 0x0411, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS)
+//
+// Define alignment requirements for variable length components in extended SRB.
+// For Win64, need to ensure all variable length components are 8 bytes align
+// so the pointer fields within the variable length components are 8 bytes align.
+//
+#if defined(_WIN64) || defined(_M_ALPHA)
+#define STOR_ADDRESS_ALIGN           DECLSPEC_ALIGN(8)
+#else
+#define STOR_ADDRESS_ALIGN
+#endif
+
+
+//
+// Generic structure definition for accessing any STOR_ADDRESS. All
+// STOR_ADDRESS must begin with a Type, Port and AddressLength field.
+//
+typedef struct STOR_ADDRESS_ALIGN _STOR_ADDRESS {
+    USHORT Type;
+    USHORT Port;
+    ULONG AddressLength;
+    _Field_size_bytes_(AddressLength) UCHAR AddressData[ANYSIZE_ARRAY];
+} STOR_ADDRESS, *PSTOR_ADDRESS;
+
+// Define different storage address types
+#define STOR_ADDRESS_TYPE_UNKNOWN   0x0
+#define STOR_ADDRESS_TYPE_BTL8      0x1
+#define STOR_ADDRESS_TYPE_MAX       0xffff
+
+// Define 8 bit bus, target and LUN address scheme
+#define STOR_ADDR_BTL8_ADDRESS_LENGTH    4
+typedef struct STOR_ADDRESS_ALIGN _STOR_ADDR_BTL8 {
+    _Field_range_(STOR_ADDRESS_TYPE_BTL8, STOR_ADDRESS_TYPE_BTL8)
+        USHORT Type;
+    USHORT Port;
+    _Field_range_(STOR_ADDR_BTL8_ADDRESS_LENGTH, STOR_ADDR_BTL8_ADDRESS_LENGTH)
+        ULONG AddressLength;
+    UCHAR Path;
+    UCHAR Target;
+    UCHAR Lun;
+    UCHAR Reserved;
+} STOR_ADDR_BTL8, *PSTOR_ADDR_BTL8;
+
 typedef struct _SCSI_PASS_THROUGH_EX {
     ULONG Version;
     ULONG Length;                   // size of the structure
@@ -107,6 +151,7 @@ typedef struct _SCSI_PASS_THROUGH_EX {
     _Field_size_bytes_full_(CdbLength) UCHAR Cdb[ANYSIZE_ARRAY];
 } SCSI_PASS_THROUGH_EX, *PSCSI_PASS_THROUGH_EX;
 #endif
+
 
 /* ===================================================================== */
 /* ============================== Contants/Macros ====================== */
@@ -145,6 +190,16 @@ typedef struct _SCSI_PASS_THROUGH_EX {
 #define SPC3_SENSE_LEN  UINT8_C(252)
 #define SCSI_OPERATION_CODE (0)
 
+#define DOUBLE_BUFFERED_MAX_TRANSFER_SIZE   16384
+
+#define safe_Free(mem)  \
+    if(mem)                 \
+    {                       \
+            free(mem);          \
+            mem = NULL;         \
+    }                       \
+
+
 /* ===================================================================== */
 /* ================================ Types ============================== */
 /* ===================================================================== */
@@ -173,16 +228,22 @@ typedef enum _eDataTransferDirection
 } eDataTransferDirection;
 
 typedef struct _tScsiPassThroughIOStruct {
-    union {
-        SCSI_PASS_THROUGH_DIRECT    scsiPassthroughDirect;
-        SCSI_PASS_THROUGH           scsiPassthrough;
-    };
-    ULONG                       padding;//trying to help buffer alignment like the MS example shows.
-    UCHAR                       senseBuffer[SPC3_SENSE_LEN]; // If we do auto-sense, we need to allocate 252 bytes, according to SPC-3.
-    UCHAR                       dataBuffer[1];//for double buffered transfer only
+    SCSI_PASS_THROUGH           scsiPassthrough;
+    ULONG                       padding;
+    UCHAR                       senseBuffer[SPC3_SENSE_LEN];
+    UCHAR                       dataBuffer[1];
 } tScsiPassThroughIOStruct;
 
-
+typedef struct _tScsiPassThroughEXIOStruct
+{
+    SCSI_PASS_THROUGH_EX           scsiPassThroughEX;
+    UCHAR                           cdbPad[CDB_LEN_32 - 1];
+    ULONG                           padding;
+    STOR_ADDR_BTL8                  storeAddr;
+    UCHAR                           senseBuffer[SPC3_SENSE_LEN];
+    UCHAR                           dataInBuffer[DOUBLE_BUFFERED_MAX_TRANSFER_SIZE];
+    UCHAR                           dataOutBuffer[DOUBLE_BUFFERED_MAX_TRANSFER_SIZE];
+} tScsiPassThroughEXIOStruct;
 /* ===================================================================== */
 /* ========================  NVME-related items ======================== */
 /* ===================================================================== */
@@ -230,6 +291,8 @@ typedef enum _eSenseFormat{
 
 typedef struct _tScsiContext {
     HANDLE          hDevice;
+    ULONG           alignmentMask;
+    UCHAR           srbType;
     SCSI_ADDRESS    scsiAddr;
     uint8_t         cdb[64]; //64 just so if we ever get there.
     uint8_t         cdbLength;

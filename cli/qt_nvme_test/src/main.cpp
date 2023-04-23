@@ -8,6 +8,7 @@
 #include <strsafe.h>
 #include <io.h>
 #include <lmcons.h>
+#include <intsafe.h>
 
 #define DRIVENAME "\\\\.\\PhysicalDrive0"
 
@@ -28,6 +29,143 @@ void *calloc_aligned(size_t num, size_t size, size_t alignment)
     }
     return zeroedMem;
 }
+
+void calloc_free(void * zeroedMem ) {
+    _aligned_free(zeroedMem);
+}
+
+
+BOOL QueryPropertyForDevice(
+        HANDLE DeviceHandle,
+        PULONG AlignmentMask,
+        PUCHAR SrbType){
+    PSTORAGE_ADAPTER_DESCRIPTOR adapterDescriptor = NULL;
+    PSTORAGE_DEVICE_DESCRIPTOR deviceDescriptor = NULL;
+    STORAGE_DESCRIPTOR_HEADER header = {0};
+
+    BOOL ok = TRUE;
+    BOOL failed = TRUE;
+    ULONG i;
+
+    *AlignmentMask = 0; // default to no alignment
+    *SrbType = 0; // default to SCSI_REQUEST_BLOCK
+
+    // Loop twice:
+    //  First, get size required for storage adapter descriptor
+    //  Second, allocate and retrieve storage adapter descriptor
+    //  Third, get size required for storage device descriptor
+    //  Fourth, allocate and retrieve storage device descriptor
+    for (i=0;i<4;i++) {
+
+        PVOID buffer = NULL;
+        ULONG bufferSize = 0;
+        ULONG returnedData;
+
+        STORAGE_PROPERTY_QUERY query{};
+
+        switch(i) {
+        case 0: {
+            query.QueryType = PropertyStandardQuery;
+            query.PropertyId = StorageAdapterProperty;
+            bufferSize = sizeof(STORAGE_DESCRIPTOR_HEADER);
+            buffer = &header;
+            break;
+        }
+        case 1: {
+            query.QueryType = PropertyStandardQuery;
+            query.PropertyId = StorageAdapterProperty;
+            bufferSize = header.Size;
+            if (bufferSize != 0) {
+                adapterDescriptor = (PSTORAGE_ADAPTER_DESCRIPTOR) LocalAlloc(LPTR, bufferSize);
+                if (adapterDescriptor == NULL) {
+                    goto Cleanup;
+                }
+            }
+            buffer = adapterDescriptor;
+            break;
+        }
+        case 2: {
+            query.QueryType = PropertyStandardQuery;
+            query.PropertyId = StorageDeviceProperty;
+            bufferSize = sizeof(STORAGE_DESCRIPTOR_HEADER);
+            buffer = &header;
+            break;
+        }
+        case 3: {
+            query.QueryType = PropertyStandardQuery;
+            query.PropertyId = StorageDeviceProperty;
+            bufferSize = header.Size;
+
+            if (bufferSize != 0) {
+                deviceDescriptor = (PSTORAGE_DEVICE_DESCRIPTOR) LocalAlloc(LPTR, bufferSize);
+                if (deviceDescriptor == NULL) {
+                    goto Cleanup;
+                }
+            }
+            buffer = deviceDescriptor;
+            break;
+        }
+        }
+
+        // buffer can be NULL if the property queried DNE.
+        if (buffer != NULL) {
+            RtlZeroMemory(buffer, bufferSize);
+
+            // all setup, do the ioctl
+            ok = DeviceIoControl(DeviceHandle,
+                                 IOCTL_STORAGE_QUERY_PROPERTY,
+                                 &query,
+                                 sizeof(STORAGE_PROPERTY_QUERY),
+                                 buffer,
+                                 bufferSize,
+                                 &returnedData,
+                                 FALSE);
+            if (!ok) {
+                if (GetLastError() == ERROR_MORE_DATA) {
+                    // this is ok, we'll ignore it here
+                } else if (GetLastError() == ERROR_INVALID_FUNCTION) {
+                    // this is also ok, the property DNE
+                } else if (GetLastError() == ERROR_NOT_SUPPORTED) {
+                    // this is also ok, the property DNE
+                } else {
+                    // some unexpected error -- exit out
+                    goto Cleanup;
+                }
+                // zero it out, just in case it was partially filled in.
+                RtlZeroMemory(buffer, bufferSize);
+            }
+        }
+    } // end i loop
+
+    // adapterDescriptor is now allocated and full of data.
+    // deviceDescriptor is now allocated and full of data.
+
+    if (adapterDescriptor == NULL) {
+        printf("   ***** No adapter descriptor supported on the device *****\n");
+    } else {
+        *AlignmentMask = adapterDescriptor->AlignmentMask;
+        *SrbType = adapterDescriptor->SrbType;
+    }
+
+    if (deviceDescriptor == NULL) {
+        printf("   ***** No device descriptor supported on the device  *****\n");
+    } else {
+        // PrintDeviceDescriptor(deviceDescriptor);
+    }
+
+    failed = FALSE;
+
+Cleanup:
+    if (adapterDescriptor != NULL) {
+        LocalFree( adapterDescriptor );
+    }
+    if (deviceDescriptor != NULL) {
+        LocalFree( deviceDescriptor );
+    }
+    return (!failed);
+
+}
+
 
 
 void print_Windows_Error_To_Screen(unsigned int windowsError) {
@@ -186,17 +324,23 @@ void identifyNSIDList(HANDLE hHandle) {
 
 // same identifyNSIDList() - list all active NSIDs via SCSI passthrough
 void reportLuns(HANDLE hHandle) {
-    uint32_t reportLunsDataSize = 8 + 50 *8; // Be carefully with this value ,
+    uint32_t reportLunsDataSize = 16 + 50*8; // Be carefully with this value ,
                                             // not sure why if we increase or reduce this will break the DeviceIOControl Function
-    uint8_t* reportLunsData =  C_CAST(uint8_t*, malloc(reportLunsDataSize));
+    uint8_t* reportLunsData =  C_CAST(uint8_t*, calloc_aligned(reportLunsDataSize, sizeof(uint8_t), 8)); //malloc(reportLunsDataSize));
     uint32_t dataLength = 40;
-    uint8_t* ptrData =  C_CAST(uint8_t*,  calloc_aligned(dataLength, sizeof(uint8_t), 4));
+    uint8_t* ptrData =  C_CAST(uint8_t*,  calloc_aligned(dataLength, sizeof(uint8_t), 8));
 
     std::cout << "\n-----List all NSID listt:------\n";
 
     tScsiContext * scsiContext =  (tScsiContext *) malloc(sizeof(tScsiContext));
     scsiContext->hDevice = hHandle;
     ZeroMemory(ptrData,  dataLength * 4);
+    if (!QueryPropertyForDevice(hHandle, &scsiContext->alignmentMask, &scsiContext->srbType)) {
+        std::cout << "Failed to QueryPropertyForDevice() \n";
+        return;
+    }
+    std::cout << "alignmentMask:" << (ULONG)scsiContext->alignmentMask << std::endl;
+    std::cout << "srbType:" <<  (ULONG)scsiContext->srbType << std::endl;
 
     if (!NvmeUtil::GetSCSIAAddress(hHandle, &scsiContext->scsiAddr)) {
         std::cout << "Failed to get GetSCSIAAddress" << std::endl;
@@ -226,7 +370,7 @@ void reportLuns(HANDLE hHandle) {
     }
 
 
-    free(reportLunsData);
+    calloc_free(reportLunsData);
 }
 
 int main(int argc, char** argv) {

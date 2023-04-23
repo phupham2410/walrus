@@ -655,13 +655,144 @@ static BOOL sendSCSIPassThrough(tScsiContext *scsiCtx)
         }
     }
 
-    if (NULL != sptdioDB) {
-        free(sptdioDB);
-    }
+
+    safe_Free(sptdioDB);
 
     return ret;
 }
 
+static BOOL sendSCSIPassThrough_EX(tScsiContext *scsiCtx)
+{
+    BOOL           ret = FALSE;
+    BOOL          success = FALSE;
+    ULONG         returned_data = 0;
+    tScsiPassThroughEXIOStruct *sptdioEx = C_CAST(tScsiPassThroughEXIOStruct*, malloc(sizeof(tScsiPassThroughEXIOStruct)));
+    if (!sptdioEx) {
+        return FALSE;
+    }
+
+    memset(sptdioEx, 0, sizeof(tScsiPassThroughEXIOStruct));
+    memset(&sptdioEx->scsiPassThroughEX, 0, sizeof(SCSI_PASS_THROUGH_EX));
+    sptdioEx->scsiPassThroughEX.Version = 0;//MSDN says set this to zero
+    sptdioEx->scsiPassThroughEX.Length = sizeof(SCSI_PASS_THROUGH_EX);
+    sptdioEx->scsiPassThroughEX.CdbLength = scsiCtx->cdbLength;
+    sptdioEx->scsiPassThroughEX.StorAddressLength = sizeof(STOR_ADDR_BTL8);
+    sptdioEx->scsiPassThroughEX.ScsiStatus = 0;
+    sptdioEx->scsiPassThroughEX.SenseInfoLength = SPC3_SENSE_LEN;
+    sptdioEx->scsiPassThroughEX.Reserved = 0;
+    //setup the store port address struct
+    sptdioEx->storeAddr.Type = STOR_ADDRESS_TYPE_BTL8;//Microsoft documentation says to set this
+    sptdioEx->storeAddr.AddressLength = STOR_ADDR_BTL8_ADDRESS_LENGTH;
+    //The host bus adapter (HBA) port number.
+    sptdioEx->storeAddr.Port = scsiCtx->scsiAddr.PortNumber;//This may or maynot be correct. Need to test it.
+    sptdioEx->storeAddr.Path = scsiCtx->scsiAddr.PathId;
+    sptdioEx->storeAddr.Target = scsiCtx->scsiAddr.TargetId;
+    sptdioEx->storeAddr.Lun = scsiCtx->scsiAddr.Lun;
+    sptdioEx->storeAddr.Reserved = 0;
+    sptdioEx->scsiPassThroughEX.StorAddressOffset = offsetof(tScsiPassThroughEXIOStruct, storeAddr);
+    ZeroMemory(sptdioEx->senseBuffer, SPC3_SENSE_LEN);
+    switch (scsiCtx->direction) {
+    case XFER_DATA_OUT:
+        sptdioEx->scsiPassThroughEX.DataDirection = SCSI_IOCTL_DATA_OUT;
+        sptdioEx->scsiPassThroughEX.DataOutTransferLength = scsiCtx->dataLength;
+        sptdioEx->scsiPassThroughEX.DataOutBufferOffset = offsetof(tScsiPassThroughEXIOStruct, dataOutBuffer);
+        sptdioEx->scsiPassThroughEX.DataInBufferOffset = 0;
+        break;
+    case XFER_DATA_IN:
+        sptdioEx->scsiPassThroughEX.DataDirection = SCSI_IOCTL_DATA_IN;
+        sptdioEx->scsiPassThroughEX.DataInTransferLength = scsiCtx->dataLength;
+        sptdioEx->scsiPassThroughEX.DataInBufferOffset = offsetof(tScsiPassThroughEXIOStruct, dataInBuffer);
+        sptdioEx->scsiPassThroughEX.DataOutBufferOffset = 0;
+        break;
+    case XFER_NO_DATA:
+        sptdioEx->scsiPassThroughEX.DataDirection = SCSI_IOCTL_DATA_UNSPECIFIED;
+        break;
+
+    default:
+        return FALSE;
+
+    }
+
+    if (scsiCtx->timeout != 0) {
+        sptdioEx->scsiPassThroughEX.TimeOutValue = scsiCtx->timeout;
+    } else {
+        sptdioEx->scsiPassThroughEX.TimeOutValue = 15;
+    }
+
+    sptdioEx->scsiPassThroughEX.SenseInfoOffset = offsetof(tScsiPassThroughEXIOStruct, senseBuffer);
+    memcpy(sptdioEx->scsiPassThroughEX.Cdb, scsiCtx->cdb, scsiCtx->cdbLength);
+
+    SetLastError(ERROR_SUCCESS);//clear any cached errors before we try to send the command
+    scsiCtx->lastError = 0;
+    DWORD sptBufInLen = sizeof(tScsiPassThroughEXIOStruct);
+    DWORD sptBufOutLen = sizeof(tScsiPassThroughEXIOStruct);
+    switch (scsiCtx->direction) {
+    case XFER_DATA_IN:
+        sptBufOutLen += scsiCtx->dataLength;
+        break;
+    case XFER_DATA_OUT:
+        //need to copy the data we're sending to the device over!
+        if (scsiCtx->pdata)
+        {
+            memcpy(sptdioEx->dataOutBuffer, scsiCtx->pdata, scsiCtx->dataLength);
+        }
+        sptBufInLen += scsiCtx->dataLength;
+        break;
+    default:
+        break;
+    }
+
+    success = DeviceIoControl(scsiCtx->hDevice,
+                              IOCTL_SCSI_PASS_THROUGH_EX,
+                              &sptdioEx->scsiPassThroughEX,
+                              sptBufInLen,
+                              &sptdioEx->scsiPassThroughEX,
+                              sptBufOutLen,
+                              &returned_data,
+                              NULL);
+    scsiCtx->lastError = GetLastError();
+
+    scsiCtx->returnStatus.senseKey = sptdioEx->scsiPassThroughEX.ScsiStatus;
+
+    if (success) {
+        ret = TRUE;
+        if (scsiCtx->pdata && scsiCtx->direction == XFER_DATA_IN)
+        {
+            memcpy(scsiCtx->pdata, sptdioEx->dataInBuffer, scsiCtx->dataLength);
+        }
+    }
+    else {
+       ret = FALSE;
+    }
+
+    // Any sense data?
+    if (scsiCtx->psense != NULL && scsiCtx->senseDataSize > 0) {
+        memcpy(scsiCtx->psense, &sptdioEx->senseBuffer[0], M_Min(sptdioEx->scsiPassThroughEX.SenseInfoLength, scsiCtx->senseDataSize));
+    }
+
+    if (scsiCtx->psense != NULL) {
+        //use the format, sensekey, acq, acsq from the sense data buffer we passed in rather than what windows reports...because windows doesn't always match what is in your sense buffer
+        scsiCtx->returnStatus.format = scsiCtx->psense[0];
+        switch (scsiCtx->returnStatus.format & 0x7F)
+        {
+        case SCSI_SENSE_CUR_INFO_FIXED:
+        case SCSI_SENSE_DEFER_ERR_FIXED:
+            scsiCtx->returnStatus.senseKey = scsiCtx->psense[2] & 0x0F;
+            scsiCtx->returnStatus.asc = scsiCtx->psense[12];
+            scsiCtx->returnStatus.ascq = scsiCtx->psense[13];
+            break;
+        case SCSI_SENSE_CUR_INFO_DESC:
+        case SCSI_SENSE_DEFER_ERR_DESC:
+            scsiCtx->returnStatus.senseKey = scsiCtx->psense[1] & 0x0F;
+            scsiCtx->returnStatus.asc = scsiCtx->psense[2];
+            scsiCtx->returnStatus.ascq = scsiCtx->psense[3];
+            break;
+        }
+    }
+
+    safe_Free(sptdioEx)
+     return ret;
+}
 
 static BOOL scsiSendCdb(tScsiContext *scsiCtx, uint8_t *cdb, eCDBLen cdbLen, uint8_t *pdata, uint32_t dataLen, eDataTransferDirection dataDirection, uint8_t *senseData, uint32_t senseDataLen, uint32_t timeoutSeconds)
 {
@@ -700,8 +831,11 @@ static BOOL scsiSendCdb(tScsiContext *scsiCtx, uint8_t *cdb, eCDBLen cdbLen, uin
     scsiCtx->direction = dataDirection;
     scsiCtx->pdata = pdata;
     scsiCtx->dataLength = dataLen;
-    ret = sendSCSIPassThrough(scsiCtx);
-
+    if (scsiCtx->srbType == SRB_TYPE_STORAGE_REQUEST_BLOCK) {
+        ret = sendSCSIPassThrough_EX(scsiCtx);
+    } else {
+        ret = sendSCSIPassThrough(scsiCtx);
+    }
     if (senseData && senseDataLen > 0 && senseData != scsiCtx->lastCommandSenseData) {
         memcpy(scsiCtx->lastCommandSenseData, senseBuffer, M_Min(SPC3_SENSE_LEN, senseDataLen));
     }
