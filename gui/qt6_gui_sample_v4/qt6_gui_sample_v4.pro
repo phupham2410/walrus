@@ -25,8 +25,6 @@ SOURCES +=\
 HEADERS  += \
     ./src/MainWindow.h \
     ./src/Worker.h \
-    ./src/nvme.h \
-    ./src/winioctl.h \
     ./src/misc/PartWidget.h
 
 DISTFILES  += \

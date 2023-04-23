@@ -3,7 +3,7 @@
 #include "CoreUtil.h"
 
 #include <windows.h>
-#include <winioctl.h>
+#include "winioctl.h"
 
 using namespace StorageApi;
 
@@ -82,7 +82,7 @@ bool ApiUtil::SetSmartRaw(tAttrMap& smap, U16 id, U32 lo, U32 hi) {
     attr.loraw = lo; attr.hiraw = hi; return true;
 }
 
-STR ApiUtil::ToAtaAttrString̣̣̣̣̣̣(const StorageApi::sSmartAttr& sa, const char* sep) {
+STR ApiUtil::ToAtaAttrString(const StorageApi::sSmartAttr& sa, const char* sep) {
     char buffer[2048];
     sprintf(buffer, "%02X%s%30s%s%3d%s%3d%s%3d%s%08d%s%08d%s%s",
             sa.id, sep, sa.name.c_str(), sep,
@@ -140,7 +140,7 @@ STR ApiUtil::ToAttrValueString(U16 id, U32 loraw, U32 hiraw) {
         return STR(buffer);
 }
 
-STR ApiUtil::ToNvmeAttrString̣̣̣̣̣̣(const StorageApi::sSmartAttr& sa, const char* sep) {
+STR ApiUtil::ToNvmeAttrString(const StorageApi::sSmartAttr& sa, const char* sep) {
     STR vstr = ApiUtil::ToAttrValueString(sa.id, sa.loraw, sa.hiraw);
     char buffer[2048]; sprintf(buffer, "%30s%s%16s%s%10d",
                                sa.name.c_str(), sep, vstr.c_str(), sep, sa.loraw);

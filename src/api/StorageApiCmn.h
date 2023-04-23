@@ -246,8 +246,8 @@ STR StorageApi::ToString(const StorageApi::sIdentify& id, U32 indent) {
 STR StorageApi::ToString(const StorageApi::sSmartAttr& sa, U32 indent) {
     STR prefix (indent, ' '), astr;
     switch(sa.type) {
-        case AT_ATA: astr = ApiUtil::ToAtaAttrString̣̣̣̣̣̣(sa); break;
-        case AT_NVME: astr = ApiUtil::ToNvmeAttrString̣̣̣̣̣̣(sa); break;
+        case AT_ATA: astr = ApiUtil::ToAtaAttrString(sa); break;
+        case AT_NVME: astr = ApiUtil::ToNvmeAttrString(sa); break;
         default: astr = "Unknown_Attribute_Type"; break;
     }
     return prefix + astr;
@@ -337,8 +337,8 @@ STR StorageApi::ToString(const StorageApi::sDriveInfo &drv, U32 indent) {
 STR StorageApi::ToCsvString(const StorageApi::sSmartAttr& sa) {
     STR rstr; const char* sep = ";";
     switch(sa.type) {
-    case AT_ATA: rstr = ApiUtil::ToAtaAttrString̣̣̣̣̣̣(sa, sep); break;
-    case AT_NVME: rstr = ApiUtil::ToNvmeAttrString̣̣̣̣̣̣(sa, sep); break;
+    case AT_ATA: rstr = ApiUtil::ToAtaAttrString(sa, sep); break;
+    case AT_NVME: rstr = ApiUtil::ToNvmeAttrString(sa, sep); break;
     default: rstr = "Unknown_Attribute_Type"; break;
     }
     return rstr;
