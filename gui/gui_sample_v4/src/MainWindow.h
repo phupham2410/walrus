@@ -78,6 +78,7 @@ public:
             QPlainTextEdit* Console;
             QPushButton* StartBtn;
             QPushButton* StopBtn;
+            QPushButton* ReadBtn;
         } dc;
 
         struct sTrimControl {
@@ -150,6 +151,7 @@ public slots:
     void handleTrimDriveStop();
     void handleSecureWipeStart();
     void handleSecureWipeStop();
+    void handleDiskCloneRead();
     void handleDiskCloneStart();
     void handleDiskCloneStop();
     void handleDebugRead();

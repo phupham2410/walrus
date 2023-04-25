@@ -336,26 +336,29 @@ QWidget* MainWindow::buildWidget_ViewSmart() {
     BUILD_WIDGET_0(ctrl.sm, Console);
 }
 
+#include <QSplitter>
 QWidget* MainWindow::buildWidget_DiskClone() {
-    QWidget* w = new QWidget(this);
-
     ALLOC_WIDGET(QListWidget,    ctrl.dc.List    );
     ALLOC_WIDGET(QComboBox,      ctrl.dc.Target  );
     ALLOC_WIDGET(QPlainTextEdit, ctrl.dc.Console );
     ALLOC_WIDGET(QPushButton,    ctrl.dc.StartBtn);
     ALLOC_WIDGET(QPushButton,    ctrl.dc.StopBtn );
-    ctrl.dc.Console->setFixedHeight(200);
+    ALLOC_WIDGET(QPushButton,    ctrl.dc.ReadBtn );
+    // ctrl.dc.List->setFixedHeight(200);
+
+    QSplitter* splt = new QSplitter(this);
+    splt->setOrientation(Qt::Vertical);
+
+    // QHBoxLayout* l = new QHBoxLayout();
+    // l->setContentsMargins(1,1,1,1);
+    // l->setSpacing(1);
+    // l->addWidget(ctrl.dc.Console);
+
+    splt->addWidget(ctrl.dc.Console);
 
     QVBoxLayout* b = new QVBoxLayout();
     b->setContentsMargins(1,1,1,1);
     b->setSpacing(1);
-
-    QHBoxLayout* l = new QHBoxLayout();
-    l->setContentsMargins(1,1,1,1);
-    l->setSpacing(1);
-    l->addWidget(ctrl.dc.Console);
-    b->addLayout(l);
-
     b->addWidget(ctrl.dc.List);
 
     QHBoxLayout* t = new QHBoxLayout();
@@ -364,12 +367,16 @@ QWidget* MainWindow::buildWidget_DiskClone() {
     t->addWidget(new QLabel("Target Drive: "));
     t->addWidget(ctrl.dc.Target);
     t->addStretch();
+    t->addWidget(ctrl.dc.ReadBtn);
     t->addWidget(ctrl.dc.StartBtn);
     t->addWidget(ctrl.dc.StopBtn);
     b->addLayout(t);
 
+    QWidget* w = new QWidget(this);
     w->setLayout(b);
-    return w;
+    splt->addWidget(w);
+
+    return splt;
 }
 
 QWidget* MainWindow::buildWidget_SelfTest() {
@@ -474,7 +481,7 @@ void MainWindow::initWindow()
         #define CONNECT_ITEM_4(p, n, f0, f1, f2, f3) \
             CONNECT_ITEM_3(p, n, f0, f1, f2); CONNECT_ITEM_1(p, n, f3)
 
-        CONNECT_ITEM_2(ctrl.dc, DiskClone, Start, Stop);
+        CONNECT_ITEM_3(ctrl.dc, DiskClone, Read, Start, Stop);
         CONNECT_ITEM_2(ctrl.uf, UpdateFw, Start, Stop);
         CONNECT_ITEM_2(ctrl.td, TrimDrive, Start, Stop);
         CONNECT_ITEM_2(ctrl.sw, SecureWipe, Start, Stop);
@@ -748,6 +755,76 @@ void MainWindow::showWidget_DiskClone()
 
     // Fill Target with remaining drives
     FillTargetDrive(ctrl.dc.Target, scan.darr, idx);
+}
+
+#include <fileapi.h>
+#include <errhandlingapi.h>
+
+void MainWindow::handleDiskCloneRead()
+{
+    DEF_APP_DATA();
+    QPlainTextEdit* cs = ctrl.dc.Console;
+
+    int idx = ctrl.DrvList->currentRow();
+    int maxi = scan.darr.size();
+    RETURN_NO_DRIVE_FOUND_IF(!maxi);
+    RETURN_NO_SEL_DRIVE_IF(maxi && (idx < 0));
+    RETURN_WRONG_INDEX_IF((idx < 0) || (idx >= maxi));
+    RETURN_NO_TARGET_DRIVE_IF(maxi <= 1);
+
+    // Generate random params for DiskClone
+    // In the real code, user will select these params from GUI
+    const StorageApi::sDriveInfo& drv = scan.darr[idx];
+    tAddrArray pa;  GetSourcePartArray(ctrl.dc.List, pa);
+    string dstname; GetTargetDriveInfo(ctrl.dc.Target, dstname);
+
+    // Now, clone partitions in parr to new target drive
+    setLog(cs, "Reading Drive " + QString(drv.name.c_str()));
+
+    enableGui(false);
+
+    // read drive drv, from address in pa
+    do {
+        stringstream sstr;
+        if (pa.size() > 1) {
+            appendLog(cs, "Too many partitions"); break;
+        }
+        const tPartAddr& addr = pa[0];
+
+        StorageApi::HDL hdl; eRetCode ret;
+        ret = StorageApi::Open(drv.name, hdl);
+        if (RET_OK != ret) {
+            sstr << "Cannot open device " << drv.name << endl
+                 << "Ret code: " << StorageApi::ToString(ret) << endl;
+            appendLog(cs, sstr.str().c_str()); break;
+        }
+
+        DWORD sc = 256, bufsize = sc * 512, rsize, rval;
+        LONG lopos = addr.first & 0xFFFFFFFF;
+        LONG hipos = (addr.first >> 32) & 0xFFFFFFFF;
+
+        if (SetFilePointer((HANDLE)hdl, lopos, &hipos, 0) == INVALID_SET_FILE_POINTER) {
+            rval = GetLastError();
+            sstr << "Cannot seek file pointer. Error code: " << rval << endl;
+            appendLog(cs, sstr.str().c_str()); break;
+        }
+
+        U8* bufptr = (U8*) malloc(bufsize); memset(bufptr, 0x00, bufsize);
+        if (ReadFile((HANDLE) hdl, bufptr, bufsize, &rsize, NULL)) {
+            stringstream rstr; U8* ptr = bufptr;
+            for (U32 i = 0; i < sc; i++, ptr += 512) {
+                U64 lba = (addr.first >> 9) + i;
+                rstr << "LBA: " << lba << ": " << endl;
+                rstr << HexFrmt::ToHexString(ptr, 512) << endl;
+            }
+
+            appendLog(cs, rstr.str().c_str());
+        }
+
+        StorageApi::Close(hdl);
+    } while(0);
+
+    enableGui(true);
 }
 
 void MainWindow::handleDiskCloneStart()
