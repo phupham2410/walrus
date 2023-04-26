@@ -48,7 +48,9 @@ void PartWidget::setPart(const StorageApi::sPartition& p) {
     F64 maxcap = maxcap = mincap + 200; // enable to extend 200GB
 
     wstringstream sstr;
-    sstr << mincap << " GB" << endl; sstr << p.name;
+    sstr << mincap << " GB";
+    sstr << " Start: " << p.addr.first << " Count: " << p.addr.second << endl;
+    sstr << p.name;
 
     ctrl.lbl->setText(QString::fromStdWString(sstr.str()));
     ctrl.sel->setChecked(true);

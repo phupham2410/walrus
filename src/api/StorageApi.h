@@ -162,8 +162,8 @@ namespace StorageApi {
     struct sProgress {
         bool ready;   // ready to be read from client thread
         bool stop;    // stop request from client thread
-        U32 workload; // max workload of current task
-        U32 progress; // current progress ( 0 -> workload)
+        U64 workload; // max workload of current task
+        U64 progress; // current progress ( 0 -> workload)
         STR info;     // output info of some operation
         eRetCode rval;// return value
         bool done;    // complete status of current task

@@ -612,16 +612,15 @@ void SelfTestThreadFunc(void* param) {
 void MainWindow::handleSelfTestMode0() {}
 void MainWindow::handleSelfTestMode1() {}
 void MainWindow::handleSelfTestMode2()  {}
-void MainWindow::handleSelfTestStop() {}
 void MainWindow::handleUpdateFwStart() {}
-void MainWindow::handleUpdateFwStop() {}
 void MainWindow::handleTrimDriveStart() {}
-void MainWindow::handleTrimDriveStop() {}
 void MainWindow::handleSecureWipeStart() {}
-void MainWindow::handleSecureWipeStop() {}
 void MainWindow::handleDebugRead() {}
-void MainWindow::handleDebugFill() {}
-void MainWindow::handleDebugStop() {}
+void MainWindow::handleDebugStop() { handleCommonStop(); }
+void MainWindow::handleUpdateFwStop() { handleCommonStop(); }
+void MainWindow::handleSelfTestStop() { handleCommonStop(); }
+void MainWindow::handleTrimDriveStop() { handleCommonStop(); }
+void MainWindow::handleSecureWipeStop() { handleCommonStop(); }
 
 void MainWindow::showWidget_SelfTest()
 {
@@ -789,7 +788,8 @@ void MainWindow::handleDiskCloneRead()
         if (pa.size() > 1) {
             appendLog(cs, "Too many partitions"); break;
         }
-        const tPartAddr& addr = pa[0];
+        tPartAddr addr = tPartAddr(0, 0);
+        if (pa.size()) addr = pa[0];
 
         StorageApi::HDL hdl; eRetCode ret;
         ret = StorageApi::Open(drv.name, hdl);
@@ -1242,6 +1242,156 @@ void MainWindow::handleFillDrive()
     enableGui(false);
     cmn.initCommonParam(drv.name);
     startWorker(FillDriveThreadFunc, &cmn);
+    waitProcessing(cmn.progress);
+
+    std::stringstream sstr;
+    std::string info = *const_cast<std::string*>(&cmn.progress.info);
+    sstr << "Debug Done! Return Code: "
+         << StorageApi::ToString(cmn.progress.rval) << std::endl
+         << "Report: " << std::endl << info;
+    setLog(cs, QString(sstr.str().c_str()));
+    enableGui(true);
+}
+
+#include <fileapi.h>
+#include <QMessageBox>
+
+static bool ConfirmFillDrive(const string& drvname) {
+    QMessageBox::StandardButton reply;
+    QString ttl = "Fill Drive";
+    QString msg = "Do you want to fill drive " + QString(drvname.c_str()) + "?";
+    reply = QMessageBox::question(NULL, ttl, msg, QMessageBox::Ok | QMessageBox::Cancel);
+
+    return (reply == QMessageBox::Ok) ? true : false;
+}
+
+void FormatBuffer(U8* bufptr, U64 lba, U32 wrtcnt) {
+    char tmp[33] = {0}; U8* ptr = bufptr;
+    sprintf(tmp, "LBA %12X CNT %10d ", lba, wrtcnt);
+    memcpy(ptr, tmp, 32); ptr += 32;
+
+    const char* pat =
+        "LINE1:PHOTOCOPY BRILLIANT WHITE#"
+        "LINE2:PHOTOCOPY BRILLIANT WHITE#"
+        "LINE3:PHOTOCOPY BRILLIANT WHITE#"
+        "LINE4:PHOTOCOPY BRILLIANT WHITE#"
+        "LINE5:PHOTOCOPY BRILLIANT WHITE#"
+        "LINE6:PHOTOCOPY BRILLIANT WHITE#"
+        "LINE7:PHOTOCOPY BRILLIANT WHITE#"
+        "LINE8:PHOTOCOPY BRILLIANT WHITE#"
+        "LINE9:PHOTOCOPY BRILLIANT WHITE#"
+        "LINEA:PHOTOCOPY BRILLIANT WHITE#"
+        "LINEB:PHOTOCOPY BRILLIANT WHITE#"
+        "LINEC:PHOTOCOPY BRILLIANT WHITE#"
+        "LINED:PHOTOCOPY BRILLIANT WHITE#"
+        "LINEE:PHOTOCOPY BRILLIANT WHITE#"
+        "LINEF:PHOTOCOPY BRILLIANT WHITE#";
+
+    memcpy(ptr, pat, 32 * 15);
+}
+
+U32 FormatBuffer(U8* bufptr, U32 bufsec, U64 lba, U32 wrtsec, U32 wrtcnt) {
+    // LBA XXXXXXXXXXXX CNT XXXXXXXXXX
+    // PATTERNPATTERNPATTERNPATTERNPATT
+    // RNPATTERNPATTERNPATTERNPATTERNPA
+    // TERNPATTERNPATTERNPATTERNPATTERN
+    // ATTERNPATTERNPATTERNPATTERNPATTE
+    // NPATTERNPATTERNPATTERNPATTERNPAT
+    // ERNPATTERNPATTERNPATTERNPATTERNP
+    // TTERNPATTERNPATTERNPATTERNPATTER
+    // PATTERNPATTERNPATTERNPATTERNPATT
+    // RNPATTERNPATTERNPATTERNPATTERNPA
+    // TERNPATTERNPATTERNPATTERNPATTERN
+    // ATTERNPATTERNPATTERNPATTERNPATTE
+    // NPATTERNPATTERNPATTERNPATTERNPAT
+    // ERNPATTERNPATTERNPATTERNPATTERNP
+    // TTERNPATTERNPATTERNPATTERNPATTER
+    // PATTERNPATTERNPATTERNPATTERNPATT
+    // RNPATTERNPATTERNPATTERNPATTERNPA
+
+    U32 minsec = MIN2(bufsec, wrtsec);
+
+    for(U64 i = lba, maxi = lba + minsec; i < maxi; i++) {
+        FormatBuffer(bufptr + (i - lba) * 512, i, wrtcnt);
+    }
+
+    return minsec;
+}
+
+static void DebugFillThreadFunc(void* param) {
+    DEF_APP_DATA();
+
+    volatile StorageApi::sProgress* prog = &cmn.progress;
+
+    StorageApi::sDriveInfo drv;
+    if (!data.getDriveInfo(cmn.drvname, drv)) {
+        prog->ready = true;
+        prog->rval = StorageApi::RET_NOT_FOUND; prog->done = true; return;
+    }
+
+    // U64 cap_in_sector = drv.id.cap;
+    U64 cap_in_sector = 10 << 21;
+    prog->progress = 0; prog->workload = cap_in_sector; prog->ready = true;
+
+    HDL hdl;
+    if (RET_OK != StorageApi::Open(cmn.drvname, hdl)) {
+        prog->rval = StorageApi::RET_NO_PERMISSION; prog->done = true; return;
+    }
+
+    U32 bufsec = 8192, bufsize = bufsec * 512;
+    U32 wrtsec, remsec = cap_in_sector;
+    DWORD wrtsize;
+
+    U8* bufptr = (U8*) malloc(bufsize);
+    if (!bufptr) {
+        prog->rval = StorageApi::RET_OUT_OF_MEMORY; prog->done = true; return;
+    }
+
+    stringstream sstr;
+
+    for (U64 lba = 0; lba < cap_in_sector; lba += wrtsec) {
+        if (prog->stop) {
+            sstr << "Fill stopped";
+            *(const_cast<std::string*>(&prog->info)) += sstr.str();
+            prog->rval = StorageApi::RET_ABORTED; prog->done = true; return;
+        }
+        // Build buffer to write at address lba;
+        wrtsec = MIN2(remsec, bufsec);
+        FormatBuffer(bufptr, bufsec, lba, wrtsec, 0); // 0: write_count
+        sstr << "Writing lba " << lba << " sc " << wrtsec << endl;
+        if (!WriteFile((HANDLE) hdl, bufptr, wrtsec * 512, &wrtsize, NULL)) {
+            sstr << "Last Error: " << GetLastError();
+            *(const_cast<std::string*>(&prog->info)) += sstr.str();
+            prog->rval = StorageApi::RET_FAIL; prog->done = true; return;
+        }
+
+        remsec -= wrtsec; prog->progress += wrtsec;
+    }
+    free(bufptr); StorageApi::Close(hdl);
+    prog->rval = StorageApi::RET_OK; prog->done = true;
+}
+
+void MainWindow::handleDebugFill()
+{
+    // Fill data in selected drive using WriteFile
+
+    DEF_APP_DATA();
+    QPlainTextEdit* cs = ctrl.db.Console;
+
+    int idx = ctrl.DrvList->currentRow();
+    int maxi = scan.darr.size();
+    RETURN_NO_DRIVE_FOUND_IF(!maxi);
+    RETURN_NO_SEL_DRIVE_IF(maxi && (idx < 0));
+    RETURN_WRONG_INDEX_IF((idx < 0) || (idx >= maxi));
+    const StorageApi::sDriveInfo& drv = scan.darr[idx];
+    RETURN_NOT_SUPPORT_IF(!drv.id.features.lbamode);
+    setLog(cs, "Fill drive with pattern " + QString(drv.name.c_str()));
+
+    if (!ConfirmFillDrive(drv.name)) return;
+
+    enableGui(false);
+    cmn.initCommonParam(drv.name);
+    startWorker(DebugFillThreadFunc, &cmn);
     waitProcessing(cmn.progress);
 
     std::stringstream sstr;
