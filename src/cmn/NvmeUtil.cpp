@@ -1,7 +1,7 @@
 #include "NvmeUtil.h"
 #include <stdlib.h>
 #include <stddef.h>
-#include "winioctl.h"
+#include <winioctl.h>
 #include <ntddscsi.h>
 
 using namespace std;
@@ -917,4 +917,133 @@ BOOL NvmeUtil::ScsiSanitizeCmd(tScsiContext *scsiCtx, eScsiSanitizeType sanitize
     return result;
 }
 
+
+
+BOOL NvmeUtil::win10FW_GetfwdlInfoQuery(HANDLE hHandle,PSTORAGE_HW_FIRMWARE_INFO fwdlInfo)
+{
+    BOOL ret = FALSE;
+
+    STORAGE_HW_FIRMWARE_INFO_QUERY fwdlInfoQuery;
+    memset(&fwdlInfoQuery, 0, sizeof(STORAGE_HW_FIRMWARE_INFO_QUERY));
+    fwdlInfoQuery.Version = sizeof(STORAGE_HW_FIRMWARE_INFO_QUERY);
+    fwdlInfoQuery.Size = sizeof(STORAGE_HW_FIRMWARE_INFO_QUERY);
+    uint8_t slotCount = 7;//7 is maximum number of firmware slots...always reading with this for now since it doesn't hurt sas/sata drives. - TJE
+    uint32_t outputDataSize = sizeof(STORAGE_HW_FIRMWARE_INFO) + (sizeof(STORAGE_HW_FIRMWARE_SLOT_INFO) * slotCount);
+    uint8_t *outputData = C_CAST(uint8_t*, malloc(outputDataSize));
+    if (!outputData)
+    {
+        return FALSE;
+    }
+    memset(outputData, 0, outputDataSize);
+    DWORD returned_data = 0;
+
+    // FOR NVME
+    fwdlInfoQuery.Flags |= STORAGE_HW_FIRMWARE_REQUEST_FLAG_CONTROLLER;
+
+    int fwdlRet = DeviceIoControl(hHandle,
+                                  IOCTL_STORAGE_FIRMWARE_GET_INFO,
+                                  &fwdlInfoQuery,
+                                  sizeof(STORAGE_HW_FIRMWARE_INFO_QUERY),
+                                  outputData,
+                                  outputDataSize,
+                                  &returned_data,
+                                  NULL);
+    //Got the version info, but that doesn't mean we'll be successful with commands...
+    if (fwdlRet)
+    {
+        PSTORAGE_HW_FIRMWARE_INFO fwdlSupportedInfo = C_CAST(PSTORAGE_HW_FIRMWARE_INFO, outputData);
+
+        printf("Got Win10 FWDL Info\n");
+        printf("\tSupported: %d\n", fwdlSupportedInfo->SupportUpgrade);
+        printf("\tPayload Alignment: %ld\n", fwdlSupportedInfo->ImagePayloadAlignment);
+        printf("\tmaxXferSize: %ld\n", fwdlSupportedInfo->ImagePayloadMaxSize);
+        printf("\tPendingActivate: %d\n", fwdlSupportedInfo->PendingActivateSlot);
+        printf("\tActiveSlot: %d\n", fwdlSupportedInfo->ActiveSlot);
+        printf("\tSlot Count: %d\n", fwdlSupportedInfo->SlotCount);
+        printf("\tFirmware Shared: %d\n", fwdlSupportedInfo->FirmwareShared);
+        //print out what's in the slots!
+        for (uint8_t iter = 0; iter < fwdlSupportedInfo->SlotCount && iter < slotCount; ++iter)
+        {
+            printf("\t    Firmware Slot %d:\n", fwdlSupportedInfo->Slot[iter].SlotNumber);
+            printf("\t\tRead Only: %d\n", fwdlSupportedInfo->Slot[iter].ReadOnly);
+            printf("\t\tRevision: %s\n", fwdlSupportedInfo->Slot[iter].Revision);
+        }
+        memcpy(fwdlInfo, fwdlSupportedInfo, sizeof(STORAGE_HW_FIRMWARE_INFO));
+        ret = TRUE;
+    }
+    else
+    {
+        //DWORD lastError = GetLastError();
+        ret = FALSE;
+    }
+    safe_Free(outputData)
+        return ret;
+}
+
+
+
+BOOL NvmeUtil::win10FW_Download(HANDLE hHandle, PSTORAGE_HW_FIRMWARE_INFO fwdlInfo, BYTE slotId, PDWORDLONG pOffset, BOOL firstSegment, BOOL lastSegment, uint8_t *ptrData, DWORD dataSize){
+    BOOL ret = FALSE;
+
+    //send download IOCTL
+    DWORD downloadStructureSize = sizeof(STORAGE_HW_FIRMWARE_DOWNLOAD) + fwdlInfo->ImagePayloadMaxSize;
+    PSTORAGE_HW_FIRMWARE_DOWNLOAD downloadIO = C_CAST(PSTORAGE_HW_FIRMWARE_DOWNLOAD, malloc(downloadStructureSize));
+    if (!downloadIO)
+    {
+        return FALSE;
+    }
+    memset(downloadIO, 0, downloadStructureSize);
+    downloadIO->Version = sizeof(STORAGE_HW_FIRMWARE_DOWNLOAD);
+    downloadIO->Size = downloadStructureSize;
+    if (lastSegment) {
+        //This IS documented on MSDN but VS2015 can't seem to find it...
+        //One website says that this flag is new in Win10 1704 - creators update (10.0.15021)
+        downloadIO->Flags |= STORAGE_HW_FIRMWARE_REQUEST_FLAG_LAST_SEGMENT;
+    }
+    if (firstSegment) {
+        downloadIO->Flags |= STORAGE_HW_FIRMWARE_REQUEST_FLAG_FIRST_SEGMENT;
+    }
+
+    //if we are on NVMe, but the command comes to here, then someone forced SCSI mode, so let's set this flag correctly
+    downloadIO->Flags |= STORAGE_HW_FIRMWARE_REQUEST_FLAG_CONTROLLER;
+
+    //we need to set the offset since MS uses this in the command sent to the device.
+    downloadIO->Offset = *pOffset;//TODO: Make sure this works even though the buffer pointer is only the current segment!
+    downloadIO->Slot = slotId;
+
+    //set the size of the buffer
+    if (dataSize > fwdlInfo->ImagePayloadMaxSize) {
+        dataSize =  fwdlInfo->ImagePayloadMaxSize;
+    }
+
+    if (dataSize > 0)
+    {
+        downloadIO->BufferSize = ((dataSize - 1) / fwdlInfo->ImagePayloadAlignment + 1) * fwdlInfo->ImagePayloadAlignment;
+    }
+    else
+    {
+        downloadIO->BufferSize = 0;
+    }
+
+    //now copy the buffer into this IOCTL struct
+    memcpy(downloadIO->ImageBuffer, ptrData, dataSize);
+    //time to issue the IO
+    DWORD returned_data = 0;
+    SetLastError(ERROR_SUCCESS);//clear any cached errors before we try to send the command
+
+
+    ret = DeviceIoControl(hHandle,
+                                 IOCTL_STORAGE_FIRMWARE_DOWNLOAD,
+                                 downloadIO,
+                                 downloadStructureSize,
+                                 downloadIO,
+                                 0,
+                                 &returned_data,
+                                 NULL
+                                 );
+    if (ret) {
+        *pOffset += downloadIO->BufferSize;
+    }
+    return ret;
+}
 

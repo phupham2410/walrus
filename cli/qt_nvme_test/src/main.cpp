@@ -233,6 +233,8 @@ void identifyController(HANDLE hHandle) {
         std::cout << "SANICAP.BlockErase:" << (unsigned int)controllerData.SANICAP.BlockErase << std::endl;
         std::cout << "SANICAP.Overwrite:" << (unsigned int)controllerData.SANICAP.Overwrite << std::endl;
         std::cout << "SANICAP.NDI:" << (unsigned int)controllerData.SANICAP.NDI << std::endl;
+        std::cout << "FRMW.SlotCount" <<(unsigned int) controllerData.FRMW.SlotCount << std::endl;
+         std::cout << "FRMW.Slot1ReadOnly" <<(unsigned int) controllerData.FRMW.Slot1ReadOnly << std::endl;
 
     }
     else {
@@ -327,14 +329,14 @@ void reportLuns(HANDLE hHandle) {
     uint32_t reportLunsDataSize = 16 + 50*8; // Be carefully with this value ,
                                             // not sure why if we increase or reduce this will break the DeviceIOControl Function
     uint8_t* reportLunsData =  C_CAST(uint8_t*, calloc_aligned(reportLunsDataSize, sizeof(uint8_t), 8)); //malloc(reportLunsDataSize));
-    uint32_t dataLength = 40;
-    uint8_t* ptrData =  C_CAST(uint8_t*,  calloc_aligned(dataLength, sizeof(uint8_t), 8));
+    uint32_t dataSize = 40;
+    uint8_t* ptrData =  C_CAST(uint8_t*,  calloc_aligned(dataSize, sizeof(uint8_t), 8));
 
     std::cout << "\n-----List all NSID listt:------\n";
 
     tScsiContext * scsiContext =  (tScsiContext *) malloc(sizeof(tScsiContext));
     scsiContext->hDevice = hHandle;
-    ZeroMemory(ptrData,  dataLength * 4);
+    ZeroMemory(ptrData,  dataSize * 4);
     if (!QueryPropertyForDevice(hHandle, &scsiContext->alignmentMask, &scsiContext->srbType)) {
         std::cout << "Failed to QueryPropertyForDevice() \n";
         return;
@@ -349,7 +351,7 @@ void reportLuns(HANDLE hHandle) {
 
     if (TRUE == NvmeUtil::ScsiReportLuns(scsiContext, 0, reportLunsDataSize, reportLunsData)) {
             uint32_t lunListLength = M_BytesTo4ByteValue(reportLunsData[0], reportLunsData[1], reportLunsData[2], reportLunsData[3]);
-            for (uint32_t lunOffset = 8, nsidOffset = 0; lunOffset < (8 + lunListLength) && nsidOffset < dataLength && lunOffset < reportLunsDataSize; lunOffset += 8)
+            for (uint32_t lunOffset = 8, nsidOffset = 0; lunOffset < (8 + lunListLength) && nsidOffset < dataSize && lunOffset < reportLunsDataSize; lunOffset += 8)
             {
                 uint64_t lun = M_BytesTo8ByteValue(reportLunsData[lunOffset + 0], reportLunsData[lunOffset + 1], reportLunsData[lunOffset + 2], reportLunsData[lunOffset + 3], reportLunsData[lunOffset + 4], reportLunsData[lunOffset + 5], reportLunsData[lunOffset + 6], reportLunsData[lunOffset + 7]);
                 {
@@ -373,6 +375,40 @@ void reportLuns(HANDLE hHandle) {
     calloc_free(reportLunsData);
 }
 
+
+
+
+void doFWDownload(HANDLE hHandle) {
+    STORAGE_HW_FIRMWARE_INFO fwdlInfo;
+
+    uint8_t data[4096 * 2] = {0,1,2,3,4,5,6,7};
+    DWORDLONG offset = 0;
+
+    if (!NvmeUtil::win10FW_GetfwdlInfoQuery(hHandle, &fwdlInfo)) {
+            std::cout << "win10FW_GetfwdlInfoQuery failed:";
+            print_Windows_Error_To_Screen(GetLastError());
+            return;
+    }
+
+    std::cout << "FW download\n";
+
+    if(!NvmeUtil::win10FW_Download(hHandle, &fwdlInfo,1, &offset, FALSE, FALSE, data, 4096)) {
+        std::cout << "FW download failed at first frame:";
+        print_Windows_Error_To_Screen(GetLastError());
+        return;
+    }
+
+    if(!NvmeUtil::win10FW_Download(hHandle, &fwdlInfo, 1, &offset, FALSE, FALSE, data, 4096)) {
+        std::cout << "FW download failed at last frame:";
+        print_Windows_Error_To_Screen(GetLastError());
+        return;
+    }
+
+    std::cout << "FW download done\n";
+
+}
+
+
 int main(int argc, char** argv) {
     tHdl iHandle;
     HANDLE hHandle;
@@ -386,12 +422,14 @@ int main(int argc, char** argv) {
     hHandle = (HANDLE)iHandle;
 
     //identifyNamespace(hHandle);
-    //identifyController(hHandle);
+    identifyController(hHandle);
     //getHealthInfoLog(hHandle);
     //doSelftest(hHandle);
     //identifyNSIDList(hHandle);
 
-    reportLuns(hHandle);
+    doFWDownload(hHandle);
+
+    //reportLuns(hHandle);
 
     if (hHandle != INVALID_HANDLE_VALUE) {
         DeviceMgr::CloseDevice(iHandle);
