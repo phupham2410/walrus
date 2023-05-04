@@ -1256,13 +1256,17 @@ void MainWindow::handleFillDrive()
 #include <fileapi.h>
 #include <QMessageBox>
 
-static bool ConfirmFillDrive(const string& drvname) {
-    QMessageBox::StandardButton reply;
-    QString ttl = "Fill Drive";
-    QString msg = "Do you want to fill drive " + QString(drvname.c_str()) + "?";
-    reply = QMessageBox::question(NULL, ttl, msg, QMessageBox::Ok | QMessageBox::Cancel);
+static bool ConfirmFillDrive(const string& drvname, U32 count = 0) {
+    if (!count) count = 1;
 
-    return (reply == QMessageBox::Ok) ? true : false;
+    for (U32 i = 0; i < count; i++) {
+        QMessageBox::StandardButton reply;
+        QString ttl = "Fill Drive";
+        QString msg = "Do you want to fill drive " + QString(drvname.c_str()) + "?";
+        reply = QMessageBox::question(NULL, ttl, msg, QMessageBox::Ok | QMessageBox::Cancel);
+        if (reply != QMessageBox::Ok) return false;
+    }
+    return true;
 }
 
 void FormatBuffer(U8* bufptr, U64 lba, U32 wrtcnt) {
@@ -1318,6 +1322,10 @@ U32 FormatBuffer(U8* bufptr, U32 bufsec, U64 lba, U32 wrtsec, U32 wrtcnt) {
     return minsec;
 }
 
+#define SET_PROG_INFO(log) *(const_cast<std::string*>(&prog->info)) += log
+#define FINALIZE_PROG(code) prog->rval = StorageApi::code; prog->done = true
+
+
 static void DebugFillThreadFunc(void* param) {
     DEF_APP_DATA();
 
@@ -1325,8 +1333,7 @@ static void DebugFillThreadFunc(void* param) {
 
     StorageApi::sDriveInfo drv;
     if (!data.getDriveInfo(cmn.drvname, drv)) {
-        prog->ready = true;
-        prog->rval = StorageApi::RET_NOT_FOUND; prog->done = true; return;
+        prog->ready = true; FINALIZE_PROG(RET_NOT_FOUND); return;
     }
 
     // U64 cap_in_sector = drv.id.cap;
@@ -1335,7 +1342,7 @@ static void DebugFillThreadFunc(void* param) {
 
     HDL hdl;
     if (RET_OK != StorageApi::Open(cmn.drvname, hdl)) {
-        prog->rval = StorageApi::RET_NO_PERMISSION; prog->done = true; return;
+        FINALIZE_PROG(RET_NO_PERMISSION); return;
     }
 
     U32 bufsec = 8192, bufsize = bufsec * 512;
@@ -1344,16 +1351,36 @@ static void DebugFillThreadFunc(void* param) {
 
     U8* bufptr = (U8*) malloc(bufsize);
     if (!bufptr) {
-        prog->rval = StorageApi::RET_OUT_OF_MEMORY; prog->done = true; return;
+        FINALIZE_PROG(RET_OUT_OF_MEMORY); return;
     }
 
     stringstream sstr;
 
+    // remove partition tables
+    if (1) {
+        const int zsize = 4096; U8 zbuf[zsize] = {0};
+
+        if (SetFilePointer((HANDLE)hdl, 0, NULL, 0) == INVALID_SET_FILE_POINTER) {
+            DWORD rval = GetLastError();
+            sstr << "Cannot seek file pointer from start. Error code: " << rval << endl;
+            SET_PROG_INFO(sstr.str()); FINALIZE_PROG(RET_FAIL); return;
+        }
+
+        WriteFile((HANDLE) hdl, zbuf, zsize, NULL, NULL);
+
+        if (SetFilePointer((HANDLE)hdl, -zsize, NULL, 2) == INVALID_SET_FILE_POINTER) {
+            DWORD rval = GetLastError();
+            sstr << "Cannot seek file pointer from end. Error code: " << rval << endl;
+            SET_PROG_INFO(sstr.str()); FINALIZE_PROG(RET_FAIL); return;
+        }
+
+        WriteFile((HANDLE) hdl, zbuf, zsize, NULL, NULL);
+    }
+
     for (U64 lba = 0; lba < cap_in_sector; lba += wrtsec) {
         if (prog->stop) {
             sstr << "Fill stopped";
-            *(const_cast<std::string*>(&prog->info)) += sstr.str();
-            prog->rval = StorageApi::RET_ABORTED; prog->done = true; return;
+            SET_PROG_INFO(sstr.str()); FINALIZE_PROG(RET_ABORTED); return;
         }
         // Build buffer to write at address lba;
         wrtsec = MIN2(remsec, bufsec);
@@ -1361,14 +1388,12 @@ static void DebugFillThreadFunc(void* param) {
         sstr << "Writing lba " << lba << " sc " << wrtsec << endl;
         if (!WriteFile((HANDLE) hdl, bufptr, wrtsec * 512, &wrtsize, NULL)) {
             sstr << "Last Error: " << GetLastError();
-            *(const_cast<std::string*>(&prog->info)) += sstr.str();
-            prog->rval = StorageApi::RET_FAIL; prog->done = true; return;
+            SET_PROG_INFO(sstr.str()); FINALIZE_PROG(RET_FAIL); return;
         }
 
         remsec -= wrtsec; prog->progress += wrtsec;
     }
-    free(bufptr); StorageApi::Close(hdl);
-    prog->rval = StorageApi::RET_OK; prog->done = true;
+    free(bufptr); StorageApi::Close(hdl); FINALIZE_PROG(RET_OK);
 }
 
 void MainWindow::handleDebugFill()
@@ -1384,10 +1409,9 @@ void MainWindow::handleDebugFill()
     RETURN_NO_SEL_DRIVE_IF(maxi && (idx < 0));
     RETURN_WRONG_INDEX_IF((idx < 0) || (idx >= maxi));
     const StorageApi::sDriveInfo& drv = scan.darr[idx];
-    RETURN_NOT_SUPPORT_IF(!drv.id.features.lbamode);
     setLog(cs, "Fill drive with pattern " + QString(drv.name.c_str()));
 
-    if (!ConfirmFillDrive(drv.name)) return;
+    if (!ConfirmFillDrive(drv.name, 4)) return;
 
     enableGui(false);
     cmn.initCommonParam(drv.name);
