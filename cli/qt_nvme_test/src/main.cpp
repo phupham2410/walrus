@@ -15,7 +15,7 @@
 #include <ntddscsi.h>
 #include <winioctl.h>
 
-#define DRIVENAME "\\\\.\\PhysicalDrive0"
+#define DRIVENAME "\\\\.\\PhysicalDrive1"
 
 
 void *calloc_aligned(size_t num, size_t size, size_t alignment)
@@ -251,7 +251,7 @@ void identifyController(HANDLE hHandle) {
 void getHealthInfoLog(HANDLE hHandle) {
     std::cout << "\n-----Get Health Info:------\n";
     NVME_HEALTH_INFO_LOG healthInfoLog;
-    if (NvmeUtil::GetSMARTHealthInfoLog(hHandle, &healthInfoLog)) {
+    if (NvmeUtil::GetHealthInfoLog(hHandle, &healthInfoLog)) {
         std::cout << "CriticalWarning.AvailableSpaceLow: " << (uint32_t) healthInfoLog.CriticalWarning.AvailableSpaceLow << std::endl;
         std::cout << "CriticalWarning.TemperatureThreshold: " << (uint32_t) healthInfoLog.CriticalWarning.TemperatureThreshold << std::endl;
         std::cout << "CriticalWarning.ReliabilityDegraded: " << (uint32_t) healthInfoLog.CriticalWarning.ReliabilityDegraded << std::endl;
