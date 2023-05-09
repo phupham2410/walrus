@@ -9,6 +9,11 @@
 #include <io.h>
 #include <lmcons.h>
 #include <intsafe.h>
+#include <windows.h>
+#include <windows.h>
+#include <ntdddisk.h>
+#include <ntddscsi.h>
+#include <winioctl.h>
 
 #define DRIVENAME "\\\\.\\PhysicalDrive0"
 
@@ -377,7 +382,7 @@ void reportLuns(HANDLE hHandle) {
 
 
 
-
+#if 0
 void doFWDownload(HANDLE hHandle) {
     STORAGE_HW_FIRMWARE_INFO fwdlInfo;
 
@@ -404,10 +409,222 @@ void doFWDownload(HANDLE hHandle) {
         return;
     }
 
-    std::cout << "FW download done\n";
 
+    if (!NvmeUtil::win10FW_Active(hHandle,   &fwdlInfo, 1)) {
+            std::cout << "FW download failed at activate:";
+            print_Windows_Error_To_Screen(GetLastError());
+            return;
+    }
+
+    std::cout << "FW download done\n";
+}
+#endif
+
+BOOL readFile(HANDLE fileHandle,PUCHAR buffer, ULONG bufferLength, PULONG readLength) {
+    BOOL   result = TRUE;
+    ULONG currentReadOffset = 0;
+    ULONG tmpReadLength = 0;
+
+    RtlZeroMemory(buffer, bufferLength);
+    *readLength = 0;
+    while(currentReadOffset < bufferLength) {
+        result = ReadFile(fileHandle, &buffer[currentReadOffset], bufferLength - currentReadOffset, &tmpReadLength, NULL);
+        if (result == FALSE) {
+            return FALSE;
+        }
+
+        if (tmpReadLength == 0) {
+            break;
+        }
+
+        currentReadOffset += tmpReadLength;
+    }
+
+    *readLength = currentReadOffset;
+    return TRUE;
 }
 
+BOOL doFWDownload(HANDLE hHandle, PSTORAGE_HW_FIRMWARE_INFO fwdlInfo, BYTE slotId, LPCWSTR fwFileName, int64_t transize) {
+    BOOL                    result = TRUE;
+
+    PUCHAR                  buffer = NULL;
+    ULONG                   bufferSize;
+    ULONG                   imageBufferLength;
+
+    PSTORAGE_HW_FIRMWARE_DOWNLOAD   firmwareDownload = NULL;
+    ULONG                   returnedLength;
+
+
+    HANDLE                  fileHandle = NULL;
+    ULONG                   imageOffset;
+    ULONG                   readLength;
+    BOOLEAN                 moreToDownload;
+
+
+    /* The Max Transfer Length limits the part of buffer that may need to transfer to controller, not the whole buffer.*/
+    bufferSize = FIELD_OFFSET(STORAGE_HW_FIRMWARE_DOWNLOAD, ImageBuffer);
+    bufferSize += fwdlInfo->ImagePayloadMaxSize;
+
+    buffer = (PUCHAR)malloc(bufferSize);
+    if (buffer == NULL)
+    {
+            printf("Allocate buffer for sending firmware image file failed. Error code: %d\n", GetLastError());
+            return FALSE;
+    }
+
+    /* Setup header of firmware download data structure.*/
+    RtlZeroMemory(buffer, bufferSize);
+
+    firmwareDownload = (PSTORAGE_HW_FIRMWARE_DOWNLOAD)buffer;
+    firmwareDownload->Version = sizeof(STORAGE_HW_FIRMWARE_DOWNLOAD);
+    firmwareDownload->Size = bufferSize;
+
+    if (fwdlInfo->FirmwareShared)
+    {
+            firmwareDownload->Flags = STORAGE_HW_FIRMWARE_REQUEST_FLAG_CONTROLLER;
+    }
+    else
+    {
+            firmwareDownload->Flags = 0;
+    }
+
+    firmwareDownload->Slot = slotId;
+
+    /* Open image file and download it to controller.*/
+    //imageBufferLength = bufferSize - FIELD_OFFSET(STORAGE_HW_FIRMWARE_DOWNLOAD, ImageBuffer);
+    imageBufferLength = M_Min(bufferSize - FIELD_OFFSET(STORAGE_HW_FIRMWARE_DOWNLOAD, ImageBuffer),static_cast<ULONG>(transize*1024));
+
+
+    imageOffset = 0;
+    readLength = 0;
+    moreToDownload = TRUE;
+
+
+    fileHandle = CreateFile(fwFileName,   // file to open
+                            GENERIC_READ,          // open for reading
+                            FILE_SHARE_READ,       // share for reading
+                            NULL,                  // default security
+                            OPEN_EXISTING,         // existing file only
+                            FILE_ATTRIBUTE_NORMAL, // normal file
+                            NULL);                 // no attr. template
+
+    if (fileHandle == INVALID_HANDLE_VALUE)
+    {
+            printf("Unable to open handle for firmware image file errocode %d\n", GetLastError());
+            if (buffer != NULL)
+                free(buffer);
+            return FALSE;
+    }
+
+    while (moreToDownload)
+    {
+            result = readFile(fileHandle, firmwareDownload->ImageBuffer, imageBufferLength, &readLength);
+            if(result == FALSE)
+            {
+                printf("Read firmware file failed. Error code: %d\n", GetLastError());
+
+                if (fileHandle != NULL) {
+                    CloseHandle(fileHandle);
+                }
+
+                if (buffer != NULL) {
+                    free(buffer);
+                }
+
+                return FALSE;
+            }
+
+            if (readLength == 0)
+            {
+                if (imageOffset == 0)
+                {
+                    printf("Firmware image file read return length value 0. Error code: %d\n", GetLastError());
+                    if (fileHandle != NULL) {
+                    CloseHandle(fileHandle);
+                    }
+
+                    if (buffer != NULL) {
+                    free(buffer);
+                    }
+
+                    return FALSE;
+                }
+
+                moreToDownload = FALSE;
+                break;
+            }
+
+            firmwareDownload->Offset = imageOffset;
+
+            if (readLength > 0)
+            {
+                firmwareDownload->BufferSize = ((readLength - 1) / fwdlInfo->ImagePayloadAlignment + 1) * fwdlInfo->ImagePayloadAlignment;
+            }
+            else
+            {
+                firmwareDownload->BufferSize = 0;
+            }
+
+
+            /* download this piece of firmware to device */
+            result = DeviceIoControl(hHandle,
+                                     IOCTL_STORAGE_FIRMWARE_DOWNLOAD,
+                                     buffer,
+                                     bufferSize,
+                                     buffer,
+                                     bufferSize,
+                                     &returnedLength,
+                                     NULL
+                                     );
+
+            if (result == FALSE)
+            {
+                printf(("\t DeviceStorageFirmwareUpgrade - firmware download IOCTL failed. Error code: %d\n"), GetLastError());
+                if (fileHandle != NULL) {
+                    CloseHandle(fileHandle);
+                }
+
+                if (buffer != NULL) {
+                    free(buffer);
+                }
+
+                return FALSE;
+            }
+
+            /* Update Image Offset for next loop.*/
+            imageOffset += (ULONG)firmwareDownload->BufferSize;
+    }
+    return result;
+}
+
+void doFWDownloadFull(HANDLE hHandle) {
+    STORAGE_HW_FIRMWARE_INFO fwdlInfo;
+    LPCWSTR fileName = L""; // TODO - change file here
+
+    if (!NvmeUtil::win10FW_GetfwdlInfoQuery(hHandle, &fwdlInfo)) {
+        std::cout << "win10FW_GetfwdlInfoQuery failed:";
+        print_Windows_Error_To_Screen(GetLastError());
+        return;
+    }
+
+    std::cout << "====== FW download: ==========\n";
+
+    if (!doFWDownload(hHandle, &fwdlInfo, 1, fileName, 4096)) {
+        std::cout << "fwWin10Download failed:";
+        print_Windows_Error_To_Screen(GetLastError());
+        return;
+    }
+
+    std::cout << "====== FW Activate: ==========\n";
+
+    if (!NvmeUtil::win10FW_Active(hHandle,   &fwdlInfo, 1)) {
+            std::cout << "FW download failed at activate:";
+            print_Windows_Error_To_Screen(GetLastError());
+            return;
+    }
+
+    std::cout << "FW download done\n";
+}
 
 int main(int argc, char** argv) {
     tHdl iHandle;
@@ -427,7 +644,7 @@ int main(int argc, char** argv) {
     //doSelftest(hHandle);
     //identifyNSIDList(hHandle);
 
-    doFWDownload(hHandle);
+    doFWDownloadFull(hHandle);
 
     //reportLuns(hHandle);
 

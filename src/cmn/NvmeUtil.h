@@ -15,7 +15,7 @@
 /* ===================================================================== */
 
 // Redefine in case of Old MINGW SDK is being used
-#ifndef STORAGE_PROTOCOL_COMMAND
+#ifndef STORAGE_PROTOCOL_STRUCTURE_VERSION
 //
 // Parameter for IOCTL_STORAGE_PROTOCOL_COMMAND
 // Buffer layout: <STORAGE_PROTOCOL_COMMAND> <Command> [Error Info Buffer] [Data-to-Device Buffer] [Data-from-Device Buffer]
@@ -86,10 +86,6 @@ typedef struct _STORAGE_PROTOCOL_COMMAND {
 #define STORAGE_PROTOCOL_SPECIFIC_NVME_NVM_COMMAND      0x02
 #endif
 
-
-// Redefine in case of Old MINGW SDK is being used
-#ifndef SCSI_PASS_THROUGH_EX
-#define IOCTL_SCSI_PASS_THROUGH_EX          CTL_CODE(IOCTL_SCSI_BASE, 0x0411, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS)
 //
 // Define alignment requirements for variable length components in extended SRB.
 // For Win64, need to ensure all variable length components are 8 bytes align
@@ -132,6 +128,11 @@ typedef struct STOR_ADDRESS_ALIGN _STOR_ADDR_BTL8 {
     UCHAR Reserved;
 } STOR_ADDR_BTL8, *PSTOR_ADDR_BTL8;
 
+// Redefine in case of Old MINGW SDK is being used
+#ifndef IOCTL_SCSI_PASS_THROUGH_EX
+#define IOCTL_SCSI_PASS_THROUGH_EX          CTL_CODE(IOCTL_SCSI_BASE, 0x0411, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS)
+
+
 typedef struct _SCSI_PASS_THROUGH_EX {
     ULONG Version;
     ULONG Length;                   // size of the structure
@@ -154,7 +155,7 @@ typedef struct _SCSI_PASS_THROUGH_EX {
 
 
 // For firmware update
-#ifndef STORAGE_HW_FIRMWARE_INFO_QUERY
+#ifndef STORAGE_HW_FIRMWARE_REQUEST_FLAG_CONTROLLER
 //
 // Parameter and data structure for firmware upgrade IOCTLs
 // IOCTL_STORAGE_FIRMWARE_GET_INFO, IOCTL_STORAGE_FIRMWARE_DOWNLOAD, IOCTL_STORAGE_FIRMWARE_ACTIVATE
@@ -319,6 +320,8 @@ typedef struct _STORAGE_HW_FIRMWARE_ACTIVATE {
     BYTE    Reserved0[3];
 
 } STORAGE_HW_FIRMWARE_ACTIVATE, *PSTORAGE_HW_FIRMWARE_ACTIVATE;
+
+#define STG_S_POWER_CYCLE_REQUIRED       _HRESULT_TYPEDEF_(0x00030207L)
 #endif
 /* ===================================================================== */
 /* ============================== Contants/Macros ====================== */
@@ -497,7 +500,7 @@ public:
     // Firmware update
     static BOOL win10FW_GetfwdlInfoQuery(HANDLE hHandle, PSTORAGE_HW_FIRMWARE_INFO fwdlInfo);
     static BOOL win10FW_Download(HANDLE hHandle, PSTORAGE_HW_FIRMWARE_INFO fwdlInfo, BYTE slotId, PDWORDLONG pOffset, BOOL firstSegment, BOOL lastSegment, uint8_t *ptrData, DWORD dataSize);
-
+    static BOOL win10FW_Active(HANDLE hHandle, PSTORAGE_HW_FIRMWARE_INFO fwdlInfo, BYTE slotId);
 };
 
 #endif // NvmeUtil_H

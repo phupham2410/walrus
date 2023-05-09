@@ -3,7 +3,7 @@
 #include <stddef.h>
 #include <winioctl.h>
 #include <ntddscsi.h>
-
+#include<winerror.h>
 using namespace std;
 
 BOOL NvmeUtil::IdentifyNamespace(HANDLE hDevice, DWORD dwNSID, PNVME_IDENTIFY_NAMESPACE_DATA pNamespaceIdentify) {
@@ -1004,8 +1004,10 @@ BOOL NvmeUtil::win10FW_Download(HANDLE hHandle, PSTORAGE_HW_FIRMWARE_INFO fwdlIn
         downloadIO->Flags |= STORAGE_HW_FIRMWARE_REQUEST_FLAG_FIRST_SEGMENT;
     }
 
-    //if we are on NVMe, but the command comes to here, then someone forced SCSI mode, so let's set this flag correctly
-    downloadIO->Flags |= STORAGE_HW_FIRMWARE_REQUEST_FLAG_CONTROLLER;
+    if (fwdlInfo->FirmwareShared) {
+        //if we are on NVMe, but the command comes to here, then someone forced SCSI mode, so let's set this flag correctly
+        downloadIO->Flags |= STORAGE_HW_FIRMWARE_REQUEST_FLAG_CONTROLLER;
+    }
 
     //we need to set the offset since MS uses this in the command sent to the device.
     downloadIO->Offset = *pOffset;//TODO: Make sure this works even though the buffer pointer is only the current segment!
@@ -1047,3 +1049,79 @@ BOOL NvmeUtil::win10FW_Download(HANDLE hHandle, PSTORAGE_HW_FIRMWARE_INFO fwdlIn
     return ret;
 }
 
+BOOL NvmeUtil::win10FW_Active(HANDLE hHandle, PSTORAGE_HW_FIRMWARE_INFO fwdlInfo, BYTE slotId){
+    BOOL ret = FALSE;
+    PSTORAGE_HW_FIRMWARE_ACTIVATE   firmwareActivate = NULL;
+    PUCHAR buffer;
+    ULONGLONG  tickCountStart = 0;
+    ULONGLONG  tickCountEnd = 0;
+    ULONG returnedLength = 0;
+
+    buffer = (PUCHAR)malloc(sizeof(STORAGE_HW_FIRMWARE_ACTIVATE));
+    if (buffer == NULL) {
+        return FALSE;
+    }
+
+    memset(buffer, 0, sizeof(STORAGE_HW_FIRMWARE_ACTIVATE));
+
+    firmwareActivate = (PSTORAGE_HW_FIRMWARE_ACTIVATE) buffer;
+    firmwareActivate->Version = sizeof(STORAGE_HW_FIRMWARE_ACTIVATE);
+    firmwareActivate->Size = sizeof(STORAGE_HW_FIRMWARE_ACTIVATE);
+    firmwareActivate->Slot = slotId;
+
+    if (fwdlInfo->FirmwareShared)
+    {
+        firmwareActivate->Flags = STORAGE_HW_FIRMWARE_REQUEST_FLAG_CONTROLLER;
+    }
+
+
+    tickCountStart = GetTickCount();
+
+    /* activate firmware */
+    ret = DeviceIoControl(hHandle,
+        IOCTL_STORAGE_FIRMWARE_ACTIVATE,
+        buffer,
+        sizeof(STORAGE_HW_FIRMWARE_ACTIVATE),
+        buffer,
+        sizeof(STORAGE_HW_FIRMWARE_ACTIVATE),
+        &returnedLength,
+        NULL);
+
+    tickCountEnd = GetTickCount();
+
+
+    ULONG   seconds = (ULONG)((tickCountEnd - tickCountStart) / 1000);
+    ULONG   milliseconds = (ULONG)((tickCountEnd - tickCountStart) % 1000);
+
+    if (seconds < 5)
+    {
+        printf( ("\n\tFirmware activation process took %d.%d seconds.\n"), seconds, milliseconds);
+    }
+    else
+    {
+        printf( ("\n\tFirmware activation process took %d.%d seconds.\n"), seconds, milliseconds);
+    }
+
+    if (ret)
+    {
+        printf( ("\tNew firmware has been successfully applied to device.\n"));
+    }
+    else if (GetLastError() == STG_S_POWER_CYCLE_REQUIRED)
+    {
+        printf( ("\tWarning: Upgrade completed. Power cycle is required to activate the new firmware.\n"));
+    }
+    else
+    {
+        if (buffer != NULL) {
+            free(buffer);
+        }
+        return FALSE;
+    }
+
+    if (buffer != NULL) {
+        free(buffer);
+    }
+
+    return TRUE;
+
+}
