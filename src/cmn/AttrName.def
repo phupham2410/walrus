@@ -1,43 +1,51 @@
-MAP_ITEM(SMA_RAW_READ_ERROR         , 1  ,  true, "Raw_Read_Error_Rate"         ,"Reset at Power On")
-MAP_ITEM(SMA_REALLOCATED_SECTOR     , 5  , false, "Reallocated_Sector_Ct"       ,"")
-MAP_ITEM(SMA_POWER_ON_HOURS         , 9  ,  true, "Power_On_Hours"              ,"Reset at Power On")
-MAP_ITEM(SMA_POWER_CYCLE_COUNT      , 12 ,  true, "Power_Cycle_Count"           ,"Life Cumulative")  // 0C
-MAP_ITEM(SMA_SUDDEN_POWER_LOST_COUNT, 192,  true, "Sudden_Power_Lost_Count"     ,"Life Cumulative")  // C0
-MAP_ITEM(SMA_TEMPERATURE_CELSIUS    , 194,  true, "Temperature_Celsius"         ,"")  // C2
-MAP_ITEM(SMA_HARDWARE_ECC_RECOVERED , 195, false, "Hardware_ECC_Recovered"      ,"")  // C3
-MAP_ITEM(SMA_REALLOCATED_EVENT_COUNT, 196,  true, "Reallocated_Event_Count"     ,"")  // C4
-MAP_ITEM(SMA_PENDING_SECTOR_COUNT   , 197,  true, "Current_Pending_Sector_Count","")  //C5
-MAP_ITEM(SMA_OFFLINE_INCORRECTABLE  , 198, false, "Offline_Uncorrectable"       ,"")  // C6
-MAP_ITEM(SMA_UDMA_CRC_ERROR_COUNT   , 199,  true, "UDMA_CRC_Error_Count"        ,"Life Cumulative")  // C7
-MAP_ITEM(SMA_TOTAL_LBA_WRITTEN      , 241,  true, "Total_LBAs_Written"          ,"Life Cumulative")  // F1
-MAP_ITEM(SMA_TOTAL_LBA_READ         , 242,  true, "Total_LBAs_Read"             ,"Life Cumulative")  // F2
-MAP_ITEM(SMA_REMAINING_LIFE_LEFT    , 248,  true, "Remaining_Life_Left"         ,"Life Cumulative")  // F8
-MAP_ITEM(SMA_REMAINING_SPARE_COUNT  , 249,  true, "Remaining_Spare_Block_Count" ,"Life Cumulative")  // F9
-MAP_ITEM(SMA_UNCORRECTABLE_COUNT    , 160,  true, "Uncorrectable_Sector_Count"  ,"Reset at Power On")  // A0
-MAP_ITEM(SMA_VALID_SPARE_BLOCK      , 161,  true, "Valid_Spare_Block"           ,"Life Cumulative")  // A1
-MAP_ITEM(SMA_INITIAL_INVALID_BLOCK  , 163, false, "Initial_Invalid_Block"       ,"")  // A3
-MAP_ITEM(SMA_TOTAL_ERASE_COUNT      , 164, false, "Total_Erase_Count"           ,"")  // A4
-MAP_ITEM(SMA_MAXIMUM_ERASE_COUNT    , 165, false, "Maximum_Erase_Count"         ,"")  // A5
-MAP_ITEM(SMA_MINIMUM_ERASE_COUNT    , 166, false, "Minimum_Erase_Count"         ,"")  // A6
-MAP_ITEM(SMA_AVERAGE_ERASE_COUNT    , 167, false, "Average_Erase_Count"         ,"")  // A7
-// MAP_ITEM(SMA_REMAINING_LIFE_LEFT    , 169,  true, "Remaining_Life_Left"         ,"")  // A9 - Old ID of Remaining_Life_Left
-MAP_ITEM(SMA_TOTAL_PROGRAM_FAIL     , 181, false, "Total_Program_Fail"          ,"Life Cumulative")  // B5
-MAP_ITEM(SMA_TOTAL_ERASE_FAIL       , 182, false, "Total_Erase_Fail"            ,"Life Cumulative")  // B6
+MAP_ITEM(SMA_RAW_READ_ERROR         , 0x0000 | 1  ,  true, "Raw_Read_Error_Rate"         ,"Reset at Power On")
+MAP_ITEM(SMA_REALLOCATED_SECTOR     , 0x0000 | 5  ,  true, "Reallocated_Sector_Ct"       ,"")
+MAP_ITEM(SMA_POWER_ON_HOURS         , 0x0000 | 9  ,  true, "Power_On_Hours"              ,"Reset at Power On")
+MAP_ITEM(SMA_POWER_CYCLE_COUNT      , 0x0000 | 12 ,  true, "Power_Cycle_Count"           ,"Life Cumulative")  // 0C
+MAP_ITEM(SMA_SUDDEN_POWER_LOST_COUNT, 0x0000 | 192,  true, "Sudden_Power_Lost_Count"     ,"Life Cumulative")  // C0
+MAP_ITEM(SMA_TEMPERATURE_CELSIUS    , 0x0000 | 194,  true, "Temperature_Celsius"         ,"")  // C2
+MAP_ITEM(SMA_HARDWARE_ECC_RECOVERED , 0x0000 | 195,  true, "Hardware_ECC_Recovered"      ,"")  // C3
+MAP_ITEM(SMA_REALLOCATED_EVENT_COUNT, 0x0000 | 196,  true, "Reallocated_Event_Count"     ,"")  // C4
+MAP_ITEM(SMA_PENDING_SECTOR_COUNT   , 0x0000 | 197,  true, "Current_Pending_Sector_Count","")  //C5
+MAP_ITEM(SMA_OFFLINE_INCORRECTABLE  , 0x0000 | 198,  true, "Offline_Uncorrectable"       ,"")  // C6
+MAP_ITEM(SMA_UDMA_CRC_ERROR_COUNT   , 0x0000 | 199,  true, "UDMA_CRC_Error_Count"        ,"Life Cumulative")  // C7
+MAP_ITEM(SMA_TOTAL_LBA_WRITTEN      , 0x0000 | 241,  true, "Total_LBAs_Written"          ,"Life Cumulative")  // F1
+MAP_ITEM(SMA_TOTAL_LBA_READ         , 0x0000 | 242,  true, "Total_LBAs_Read"             ,"Life Cumulative")  // F2
+MAP_ITEM(SMA_REMAINING_LIFE_LEFT    , 0x0000 | 248,  true, "Remaining_Life_Left"         ,"Life Cumulative")  // F8
+MAP_ITEM(SMA_REMAINING_SPARE_COUNT  , 0x0000 | 249,  true, "Remaining_Spare_Block_Count" ,"Life Cumulative")  // F9
+MAP_ITEM(SMA_UNCORRECTABLE_COUNT    , 0x0000 | 160,  true, "Uncorrectable_Sector_Count"  ,"Reset at Power On")  // A0
+MAP_ITEM(SMA_VALID_SPARE_BLOCK      , 0x0000 | 161,  true, "Valid_Spare_Block"           ,"Life Cumulative")  // A1
+MAP_ITEM(SMA_INITIAL_INVALID_BLOCK  , 0x0000 | 163,  true, "Initial_Invalid_Block"       ,"")  // A3
+MAP_ITEM(SMA_TOTAL_ERASE_COUNT      , 0x0000 | 164,  true, "Total_Erase_Count"           ,"")  // A4
+MAP_ITEM(SMA_MAXIMUM_ERASE_COUNT    , 0x0000 | 165,  true, "Maximum_Erase_Count"         ,"")  // A5
+MAP_ITEM(SMA_MINIMUM_ERASE_COUNT    , 0x0000 | 166,  true, "Minimum_Erase_Count"         ,"")  // A6
+MAP_ITEM(SMA_AVERAGE_ERASE_COUNT    , 0x0000 | 167,  true, "Average_Erase_Count"         ,"")  // A7
+MAP_ITEM(SMA_TOTAL_PROGRAM_FAIL     , 0x0000 | 181,  true, "Total_Program_Fail"          ,"Life Cumulative")  // B5
+MAP_ITEM(SMA_TOTAL_ERASE_FAIL       , 0x0000 | 182,  true, "Total_Erase_Fail"            ,"Life Cumulative")  // B6
 
-MAP_ITEM(SMA_RESERVED01             , 131, false, "Temperature_Sensor1"         ,"")  // 80
-MAP_ITEM(SMA_RESERVED02             , 132, false, "Temperature_Sensor2"         ,"")  // 80
-MAP_ITEM(SMA_RESERVED03             , 133, false, "Temperature_Sensor3"         ,"")  // 80
-MAP_ITEM(SMA_RESERVED04             , 134, false, "Temperature_Sensor4"         ,"")  // 80
-MAP_ITEM(SMA_RESERVED05             , 135, false, "Temperature_Sensor5"         ,"")  // 80
-MAP_ITEM(SMA_RESERVED06             , 136, false, "Temperature_Sensor6"         ,"")  // 80
-MAP_ITEM(SMA_RESERVED07             , 137, false, "Temperature_Sensor7"         ,"")  // 80
-MAP_ITEM(SMA_RESERVED08             , 138, false, "Temperature_Sensor8"         ,"")  // 80
 
-MAP_ITEM(SMA_RESERVED11             , 141, false, "Warning_Composite_Temperature_Time"         ,"")  // 80
-MAP_ITEM(SMA_RESERVED12             , 142, false, "Critical_Composite_Temperature_Time"         ,"")  // 80
-
-MAP_ITEM(SMA_RESERVED21             , 151, false, "Media_Errors"                ,"")  // 80
-MAP_ITEM(SMA_RESERVED22             , 152, false, "Error_Info_Log_Entry_Count"  ,"")  // 80
-MAP_ITEM(SMA_RESERVED23             , 153, false, "Controller_Busy_Time"        ,"")  // 80
-MAP_ITEM(SMA_RESERVED24             , 154, false, "Host_Read_Commands"          ,"")  // 80
-MAP_ITEM(SMA_RESERVED25             , 155, false, "Host_Written_Commands"       ,"")  // 80
+// For NVMe Attributes
+MAP_ITEM(SMA_TEMP_SENSOR_1          , 0x0100 | 131,  true, "Temperature_Sensor1"         ,"")
+MAP_ITEM(SMA_TEMP_SENSOR_2          , 0x0100 | 132,  true, "Temperature_Sensor2"         ,"")
+MAP_ITEM(SMA_TEMP_SENSOR_3          , 0x0100 | 133,  true, "Temperature_Sensor3"         ,"")
+MAP_ITEM(SMA_TEMP_SENSOR_4          , 0x0100 | 134,  true, "Temperature_Sensor4"         ,"")
+MAP_ITEM(SMA_TEMP_SENSOR_5          , 0x0100 | 135,  true, "Temperature_Sensor5"         ,"")
+MAP_ITEM(SMA_TEMP_SENSOR_6          , 0x0100 | 136,  true, "Temperature_Sensor6"         ,"")
+MAP_ITEM(SMA_TEMP_SENSOR_7          , 0x0100 | 137,  true, "Temperature_Sensor7"         ,"")
+MAP_ITEM(SMA_TEMP_SENSOR_8          , 0x0100 | 138,  true, "Temperature_Sensor8"         ,"")
+MAP_ITEM(SMA_TEMP_WARNING           , 0x0100 | 141,  true, "Warning_Composite_Temp_Time" ,"")
+MAP_ITEM(SMA_TEMP_CRITICAL          , 0x0100 | 142,  true, "Critical_Composite_Temp_Time","")
+MAP_ITEM(SMA_MEDIA_ERRORS           , 0x0100 | 151,  true, "Media_Errors"                ,"")
+MAP_ITEM(SMA_ERROR_LOG_COUNT        , 0x0100 | 152,  true, "Error_Info_Log_Entry_Count"  ,"")
+MAP_ITEM(SMA_CTRL_BUSY_TIME         , 0x0100 | 153,  true, "Controller_Busy_Time"        ,"") // minute
+MAP_ITEM(SMA_HOST_CMD_READ          , 0x0100 | 154,  true, "Host_Read_Commands"          ,"")
+MAP_ITEM(SMA_HOST_CMD_WRITTEN       , 0x0100 | 155,  true, "Host_Written_Commands"       ,"")
+MAP_ITEM(SMA_DATA_UNIT_READ         , 0x0100 | 121,  true, "Data_Unit_Read"              ,"") // 1000 * sector
+MAP_ITEM(SMA_DATA_UNIT_WRITTEN      , 0x0100 | 122,  true, "Data_Unit_Written"           ,"") // 1000 * sector
+MAP_ITEM(SMA_POWER_CYCLE            , 0x0100 | 123,  true, "Power_Cycle"                 ,"")
+MAP_ITEM(SMA_NVME_POWER_ON_HOURS    , 0x0100 | 124,  true, "Power_On_Hours"              ,"")
+MAP_ITEM(SMA_UNSAFE_SHUTDOWNS       , 0x0100 | 125,  true, "Unsafe_Shutdowns"            ,"")
+MAP_ITEM(SMA_COMPOSITE_TEMP         , 0x0100 | 126,  true, "Composite_Temperature"       ,"") // Kalvin
+MAP_ITEM(SMA_SPARE_PERCENTAGE       , 0x0100 | 127,  true, "Available_Spare_Percentage"  ,"") // 0->100
+MAP_ITEM(SMA_SPARE_THRESHOLD        , 0x0100 | 128,  true, "Available_Spare_Threshold"   ,"")
+MAP_ITEM(SMA_PERCENTAGE_USED        , 0x0100 | 129,  true, "Percentage_Used"             ,"") // 0->100 -> Health = 100 - Used

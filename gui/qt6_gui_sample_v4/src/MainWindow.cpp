@@ -132,7 +132,7 @@ void MainWindow::showDriveList()
     for(int i = 0, maxi = darr.size(); i < maxi; i++) {
         const StorageApi::sDriveInfo& drv = darr[i];
         std::stringstream sstr;
-        sstr << drv.id.cap << " GB" << std::endl;
+        sstr << (drv.id.cap >> 21) << " GB" << std::endl;
         sstr << drv.id.model << std::endl
              << std::string(MODEL_MAX_LEN, '-');
         lst->addItem(QString(sstr.str().c_str()));
@@ -140,16 +140,16 @@ void MainWindow::showDriveList()
     QCoreApplication::processEvents();
 }
 
-void MainWindow::setLog(const QString &str)
+void MainWindow::setLog(QPlainTextEdit* w, const QString &str)
 {
-    ctrl.Console->setPlainText(str);
+    w->setPlainText(str);
     QCoreApplication::processEvents();
 }
 
-void MainWindow::appendLog(const QString &str)
+void MainWindow::appendLog(QPlainTextEdit* w, const QString &str)
 {
-    ctrl.Console->appendPlainText(str);
-    QScrollBar *vbar = ctrl.Console->verticalScrollBar();
+    w->appendPlainText(str);
+    QScrollBar *vbar = w->verticalScrollBar();
     vbar->setValue(vbar->maximum());
     QCoreApplication::processEvents();
 }
@@ -158,19 +158,16 @@ void MainWindow::appendLog(const QString &str)
 
 void MainWindow::enableGui(bool status) {
     QWidget* ena[] = {
-        ctrl.Console, ctrl.DrvList,
+        ctrl.DrvList,
         ctrl.ScanBtn, ctrl.InfoBtn,
         ctrl.SmartBtn, ctrl.TestBtn,
         ctrl.TrimBtn, ctrl.EraseBtn,
-        ctrl.CloneBtn, ctrl.SetopBtn,
+        ctrl.CloneBtn,
         ctrl.UpdateBtn,
-
-        ctrl.DebugBtn, ctrl.ReadBtn,
-        ctrl.FillBtn
     };
 
     QWidget* dis[] = {
-        ctrl.ProgBar, ctrl.StopBtn
+
     };
 
     int i, count;
@@ -248,27 +245,168 @@ void MainWindow::waitProcessing(volatile StorageApi::sProgress& prog) {
         curr = prog.progress;
         if (prev != curr) {
             prev = curr; setProgress(curr);
-            // appendLog("Raw status: " + QString::number(curr));
         }
     }
     resetProgress();
 }
 
+static void FormatWidget(QPlainTextEdit* w) {
+    QFont font("Courier New", 11); QFontMetrics fmtr(font);
+    w->setFont(font); w->setStyleSheet("border: 1px solid");
+    w->setLineWrapMode(QPlainTextEdit::NoWrap); w->setReadOnly(true);
+}
+
+static void FormatWidget(QListWidget* w) {
+    QFont font("Courier New", 11); QFontMetrics fmtr(font);
+    w->setFont(font); w->setStyleSheet("border: 1px solid");
+}
+
+static void FormatWidget(QComboBox* w) {
+    QFont font("Courier New", 11); QFontMetrics fmtr(font);
+    int fw = fmtr.maxWidth(), fh = fmtr.height();
+    int minw = fw * 40; w->setMinimumWidth(minw);
+    int minh = 3 * fh; w->setMinimumHeight(minh);
+    w->setFont(font); w->setStyleSheet("border: 1px solid");
+}
+
+static void FormatWidget(QPushButton* w) {
+    QFont font("Courier New", 11); QFontMetrics fmtr(font);
+    int fw = fmtr.maxWidth(), fh = fmtr.height(); w->setFixedSize(90, 3 * fh);
+}
+
+// ----------------------------------------------------------------------------
+#define ALLOC_WIDGET(t, n) do { \
+    t* __v = new t(this); FormatWidget(__v); n = __v; } while(0)
+
+#define BUILD_WIDGET_0(p, t) \
+    ALLOC_WIDGET(QPlainTextEdit, p.t); \
+    QPushButton* barr[] = { }; \
+    return buildWidget_Common(p.t, barr, 0)
+
+#define BUILD_WIDGET_2(p, t, b0, b1) \
+    ALLOC_WIDGET(QPlainTextEdit, p.t); \
+    ALLOC_WIDGET(QPushButton, p.b0); \
+    ALLOC_WIDGET(QPushButton, p.b1); \
+    QPushButton* barr[] = { p.b0, p.b1 }; \
+    return buildWidget_Common(p.t, barr, 2)
+
+#define BUILD_WIDGET_3(p, t, b0, b1, b2) \
+    ALLOC_WIDGET(QPlainTextEdit, p.t); \
+    ALLOC_WIDGET(QPushButton, p.b0); \
+    ALLOC_WIDGET(QPushButton, p.b1); \
+    ALLOC_WIDGET(QPushButton, p.b2); \
+    QPushButton* barr[] = { p.b0, p.b1, p.b2 }; \
+    return buildWidget_Common(p.t, barr, 3)
+
+#define BUILD_WIDGET_4(p, t, b0, b1, b2, b3) \
+    ALLOC_WIDGET(QPlainTextEdit, p.t); \
+    ALLOC_WIDGET(QPushButton, p.b0); \
+    ALLOC_WIDGET(QPushButton, p.b1); \
+    ALLOC_WIDGET(QPushButton, p.b2); \
+    ALLOC_WIDGET(QPushButton, p.b3); \
+    QPushButton* barr[] = { p.b0, p.b1, p.b2, p.b3 };\
+    return buildWidget_Common(p.t, barr, 4)
+
+QWidget* MainWindow::buildWidget_Common(
+    QPlainTextEdit* text, QPushButton* btn[], int cnt) {
+    QWidget* w = new QWidget(this);
+
+    QVBoxLayout* b = new QVBoxLayout();
+    b->setContentsMargins(1,1,1,1);
+    b->setSpacing(1); b->addWidget(text);
+
+    if (cnt) {
+        QHBoxLayout* r = new QHBoxLayout();
+        r->setContentsMargins(1,1,1,1);
+        r->setSpacing(1); r->addStretch();
+        for (int i = 0; i < cnt; i++) r->addWidget(btn[i]);
+        r->addStretch();
+        b->addLayout(r); b->addStretch();
+    }
+
+    w->setLayout(b);
+    return w;
+}
+
+QWidget* MainWindow::buildWidget_ViewDrive() {
+    BUILD_WIDGET_0(ctrl.di, Console);
+}
+
+QWidget* MainWindow::buildWidget_ViewSmart() {
+    BUILD_WIDGET_0(ctrl.sm, Console);
+}
+
+QWidget* MainWindow::buildWidget_DiskClone() {
+    QWidget* w = new QWidget(this);
+
+    ALLOC_WIDGET(QListWidget,    ctrl.dc.List    );
+    ALLOC_WIDGET(QComboBox,      ctrl.dc.Target  );
+    ALLOC_WIDGET(QPlainTextEdit, ctrl.dc.Console );
+    ALLOC_WIDGET(QPushButton,    ctrl.dc.StartBtn);
+    ALLOC_WIDGET(QPushButton,    ctrl.dc.StopBtn );
+    ctrl.dc.Console->setFixedHeight(200);
+
+    QVBoxLayout* b = new QVBoxLayout();
+    b->setContentsMargins(1,1,1,1);
+    b->setSpacing(1);
+
+    QHBoxLayout* l = new QHBoxLayout();
+    l->setContentsMargins(1,1,1,1);
+    l->setSpacing(1);
+    l->addWidget(ctrl.dc.Console);
+    b->addLayout(l);
+
+    b->addWidget(ctrl.dc.List);
+
+    QHBoxLayout* t = new QHBoxLayout();
+    t->setContentsMargins(1,1,1,1);
+    t->setSpacing(1);
+    t->addWidget(new QLabel("Target Drive: "));
+    t->addWidget(ctrl.dc.Target);
+    t->addStretch();
+    t->addWidget(ctrl.dc.StartBtn);
+    t->addWidget(ctrl.dc.StopBtn);
+    b->addLayout(t);
+
+    w->setLayout(b);
+    return w;
+}
+
+QWidget* MainWindow::buildWidget_SelfTest() {
+    BUILD_WIDGET_4(ctrl.st, Console, Mode0Btn, Mode1Btn, Mode2Btn, StopBtn);
+}
+
+QWidget* MainWindow::buildWidget_UpdateFw() {
+    BUILD_WIDGET_2(ctrl.uf, Console, StartBtn, StopBtn);
+}
+
+QWidget* MainWindow::buildWidget_TrimDrive() {
+    BUILD_WIDGET_2(ctrl.td, Console, StartBtn, StopBtn);
+}
+
+QWidget* MainWindow::buildWidget_SecureWipe() {
+    BUILD_WIDGET_2(ctrl.sw, Console, StartBtn, StopBtn);
+}
+
+QWidget* MainWindow::buildWidget_Debug() {
+    BUILD_WIDGET_3(ctrl.db, Console, ReadBtn, FillBtn, StopBtn);
+}
 // ----------------------------------------------------------------------------
 
 #define SHOWBTN 1
 #define HIDEBTN 0
 
+#define FRMTBTN(btn, text) do { \
+    btn->setText(text); btn->setFixedSize(90, 3 * fh); } while(0)
+
 #define ADDBTN(btn, name, box, slot, showbtn) do { \
-    btn = new QPushButton(name, this); \
-    btn->setFixedSize(90, 3 * fh); box->addWidget(btn); \
+    btn = new QPushButton(this); FRMTBTN(btn, name); box->addWidget(btn); \
     connect (btn, SIGNAL(clicked()), this, SLOT(slot())); \
     if (!showbtn) btn->hide(); } while(0)
 
 void MainWindow::initWindow()
 {
-    QFont font("Courier New", 11);
-    QFontMetrics fmtr(font);
+    QFont font("Courier New", 11); QFontMetrics fmtr(font);
     int fw = fmtr.maxWidth(), fh = fmtr.height();
 
     QHBoxLayout* layout = new QHBoxLayout();
@@ -279,19 +417,17 @@ void MainWindow::initWindow()
         QVBoxLayout* b = new QVBoxLayout();
         b->setContentsMargins(1,1,1,1);
         b->setSpacing(1);
-        ADDBTN(ctrl.ScanBtn, "Scan\nDrive", b, handleScanDrive, SHOWBTN);
-        ADDBTN(ctrl.InfoBtn, "Drive\nInfo", b, handleViewDrive, SHOWBTN);
-        ADDBTN(ctrl.SmartBtn, "SMART\nView", b, handleViewSmart, SHOWBTN);
-        ADDBTN(ctrl.SetopBtn, "Over\nProvision", b, handleSetOverProvision, HIDEBTN);
-        ADDBTN(ctrl.CloneBtn, "Disk\nClone", b, handleCloneDrive, SHOWBTN);
-        ADDBTN(ctrl.TrimBtn, "Optimize\nDrive", b, handleTrimDrive, HIDEBTN);
-        ADDBTN(ctrl.EraseBtn, "Secure\nWipe", b, handleEraseDrive, HIDEBTN);
-        ADDBTN(ctrl.TestBtn, "Self\nTest", b, handleSelfTest, HIDEBTN);
-        ADDBTN(ctrl.UpdateBtn, "Update\nFirmware", b, handleUpdateFirmware, HIDEBTN);
+        ADDBTN(ctrl.ScanBtn, "Scan\nDrive", b,        handleScanDrive, SHOWBTN);
+
+        ADDBTN(ctrl.InfoBtn, "Drive\nInfo", b,        handleViewDrive, SHOWBTN);
+        ADDBTN(ctrl.SmartBtn, "SMART\nView", b,       handleViewSmart, SHOWBTN);
+        ADDBTN(ctrl.CloneBtn, "Disk\nClone", b,       handleDiskClone, SHOWBTN);
+        ADDBTN(ctrl.TrimBtn, "Optimize\nDrive", b,    handleTrimDrive, HIDEBTN);
+        ADDBTN(ctrl.EraseBtn, "Secure\nWipe", b,      handleSecureWipe,HIDEBTN);
+        ADDBTN(ctrl.TestBtn, "Self\nTest", b,         handleSelfTest,  HIDEBTN);
+        ADDBTN(ctrl.UpdateBtn, "Update\nFirmware", b, handleUpdateFw,  HIDEBTN);
         b->addStretch();
-        ADDBTN(ctrl.DebugBtn, "Debug", b, handleDebug, SHOWBTN);
-        ADDBTN(ctrl.ReadBtn, "Test\nRead", b, handleReadDrive, SHOWBTN);
-        ADDBTN(ctrl.FillBtn, "Test\nFill", b, handleFillDrive, SHOWBTN);
+        ADDBTN(ctrl.DebugBtn, "Debug\n", b,           handleDebug,     SHOWBTN);
         layout->addLayout(b);
     }
 
@@ -303,32 +439,48 @@ void MainWindow::initWindow()
         b->setSpacing(1); b->addWidget(w);
         layout->addLayout(b);
         ctrl.DrvList = w;
-        connect(w, SIGNAL(itemClicked(QListWidgetItem*)), this, SLOT(handleViewDrive()));
+        connect(w, SIGNAL(itemClicked(QListWidgetItem*)), this, SLOT(handleSelectDrive()));
     }
 
     if(1) {
-        QPlainTextEdit* w = new QPlainTextEdit(this);
-        w->setFont(font);
-        w->setLineWrapMode(QPlainTextEdit::NoWrap);
-        w->setStyleSheet("border: 1px solid");
-        w->setReadOnly(true);
+        QStackedWidget* s = new QStackedWidget(this);
+        #define MAP_ITEM(name, code) s->addWidget(buildWidget_##name());
+        #include "FuncList.def"
+        #undef MAP_ITEM
+        s->setCurrentIndex(0);
 
         QVBoxLayout* b = new QVBoxLayout();
         b->setContentsMargins(0, 0, 0, 0);
-        b->setSpacing(1); b->addWidget(w);
+        b->setSpacing(1); b->addWidget(s);
 
         if (1) {
             QProgressBar* p = new QProgressBar(this);
-            QPushButton* s = new QPushButton("Stop", this);
-            QHBoxLayout* r = new QHBoxLayout();
-            r->addWidget(p); r->addWidget(s);
-            b->addLayout(r);
-            ctrl.ProgBar = p; ctrl.StopBtn = s;
-            connect (ctrl.StopBtn, SIGNAL(clicked()), this, SLOT(handleStop()));
+            b->addWidget(p); ctrl.ProgBar = p;
         }
 
         layout->addLayout(b);
-        ctrl.Console = w;
+        ctrl.Stack = s;
+    }
+
+    if (1) {
+        // Connect signal handlers
+        #define CONNECT_ITEM_1(prefix, name, func) \
+            FRMTBTN(prefix.func##Btn, #func); \
+            connect(prefix.func##Btn, SIGNAL(clicked()), this, SLOT(handle##name##func()))
+        #define CONNECT_ITEM_2(p, n, f0, f1) \
+            CONNECT_ITEM_1(p, n, f0); CONNECT_ITEM_1(p, n, f1)
+        #define CONNECT_ITEM_3(p, n, f0, f1, f2) \
+            CONNECT_ITEM_2(p, n, f0, f1); CONNECT_ITEM_1(p, n, f2)
+        #define CONNECT_ITEM_4(p, n, f0, f1, f2, f3) \
+            CONNECT_ITEM_3(p, n, f0, f1, f2); CONNECT_ITEM_1(p, n, f3)
+
+        CONNECT_ITEM_2(ctrl.dc, DiskClone, Start, Stop);
+        CONNECT_ITEM_2(ctrl.uf, UpdateFw, Start, Stop);
+        CONNECT_ITEM_2(ctrl.td, TrimDrive, Start, Stop);
+        CONNECT_ITEM_2(ctrl.sw, SecureWipe, Start, Stop);
+        CONNECT_ITEM_3(ctrl.db, Debug, Read, Fill, Stop);
+        CONNECT_ITEM_4(ctrl.st, SelfTest, Mode0, Mode1, Mode2, Stop);
+        #undef MAP_ITEM
     }
 
     setLayout(layout);
@@ -336,14 +488,14 @@ void MainWindow::initWindow()
     int minw = ctrl.DrvList->width() * 3.5;
     int minh = fh * 3 * 4 * 3;
     setMinimumSize(minw, minh);
-    setWindowTitle("StorageAPI Usage");
+    setWindowTitle("StorageAPI Usage V4");
     showMaximized();
     enableGui(true);
 }
 
 // ----------------------------------------------------------------------------
 
-void MainWindow::handleStop()
+void MainWindow::handleCommonStop()
 {
     DEF_APP_DATA();
 
@@ -357,47 +509,34 @@ void MainWindow::handleStop()
 }
 
 // ----------------------------------------------------------------------------
+
+void MainWindow::handleSelectDrive() {
+    int widx = ctrl.Stack->currentIndex();
+    #define MAP_ITEM(func, code) case code: showWidget_##func(); return;
+    switch(widx) {
+        #include "FuncList.def"
+    }
+    #undef MAP_ITEM
+}
+
+#define MAP_ITEM(funcname, viewidx) \
+void MainWindow::handle##funcname() { \
+        ctrl.Stack->setCurrentIndex(viewidx); showWidget_##funcname(); }
+#include "FuncList.def"
+#undef MAP_ITEM
+
+// ----------------------------------------------------------------------------
+
 #define RETURN_NO_DRIVE_FOUND_IF(cond) if (cond) do { \
-    setLog("No drive found. Please scan drive first."); return; } while(0)
+    setLog(cs, "No drive found. Please scan drive first."); return; } while(0)
 #define RETURN_NO_SEL_DRIVE_IF(cond) if (cond) do { \
-    setLog("Please select one drive."); return; } while(0)
+    setLog(cs, "Please select one drive."); return; } while(0)
 #define RETURN_WRONG_INDEX_IF(cond) if (cond) do { \
-    setLog("Something's wrong with drive index."); return; } while(0)
+    setLog(cs, "Something's wrong with drive index."); return; } while(0)
 #define RETURN_NO_TARGET_DRIVE_IF(cond) if (cond) do { \
-    setLog("No target drive found. Please insert new drive."); return; } while(0)
+    setLog(cs, "No target drive found. Please insert new drive."); return; } while(0)
 #define RETURN_NOT_SUPPORT_IF(cond) if (cond) do { \
-    setLog("Feature not support on this drive."); return; } while(0)
-// ----------------------------------------------------------------------------
-
-void MainWindow::handleViewDrive()
-{
-    DEF_APP_DATA();
-    int idx = ctrl.DrvList->currentRow();
-    int maxi = scan.darr.size();
-    RETURN_NO_DRIVE_FOUND_IF(!maxi);
-    RETURN_NO_SEL_DRIVE_IF(maxi && (idx < 0));
-    RETURN_WRONG_INDEX_IF((idx < 0) || (idx >= maxi));
-    const StorageApi::sDriveInfo& drv = scan.darr[idx];
-    setLog(QString(StorageApi::ToShortString(drv).c_str()));
-    QString pstr = QString::fromStdWString(StorageApi::ToWideString(drv.pi));
-    appendLog("Partitions: \n" + pstr);
-}
-
-// ----------------------------------------------------------------------------
-
-void MainWindow::handleViewSmart()
-{
-    DEF_APP_DATA();
-    int idx = ctrl.DrvList->currentRow();
-    int maxi = scan.darr.size();
-    RETURN_NO_DRIVE_FOUND_IF(!maxi);
-    RETURN_NO_SEL_DRIVE_IF(maxi && (idx < 0));
-    RETURN_WRONG_INDEX_IF((idx < 0) || (idx >= maxi));
-    const StorageApi::sDriveInfo& drv = scan.darr[idx];
-    RETURN_NOT_SUPPORT_IF(!drv.id.features.smart);
-    setLog(QString(StorageApi::ToString(drv.si, true, 2).c_str()));
-}
-
+    setLog(cs, "Feature not support on this drive."); return; } while(0)
 // ----------------------------------------------------------------------------
 
 void ScanDriveThreadFunc(void* param) {
@@ -409,18 +548,51 @@ void MainWindow::handleScanDrive()
 {
     DEF_APP_DATA();
     enableGui(false);
-    setLog("Scanning drive ...");
+    // setLog(cs, "Scanning drive ...");
     scan.init(); showDriveList();
     startWorker(ScanDriveThreadFunc, &scan);
     waitProcessing(scan.progress);
 
-    std::stringstream sstr;
-    sstr << "Scanning Done! Return Code: "
-         << StorageApi::ToString(scan.progress.rval) << std::endl
-         << "Number of drives: " << scan.darr.size() << std::endl;
-    sstr << "Progress info: " << scan.getProgressInfo() << std::endl;
-    appendLog(QString(sstr.str().c_str()));
+    // std::stringstream sstr;
+    // sstr << "Scanning Done! Return Code: "
+    //      << StorageApi::ToString(scan.progress.rval) << std::endl
+    //      << "Number of drives: " << scan.darr.size() << std::endl;
+    // sstr << "Progress info: " << scan.getProgressInfo() << std::endl;
+    // appendLog(cs, QString(sstr.str().c_str()));
     showDriveList(); enableGui(true);
+}
+
+// ----------------------------------------------------------------------------
+
+void MainWindow::showWidget_ViewDrive()
+{
+    DEF_APP_DATA();
+    QPlainTextEdit* cs = ctrl.di.Console;
+    int idx = ctrl.DrvList->currentRow();
+    int maxi = scan.darr.size();
+    RETURN_NO_DRIVE_FOUND_IF(!maxi);
+    RETURN_NO_SEL_DRIVE_IF(maxi && (idx < 0));
+    RETURN_WRONG_INDEX_IF((idx < 0) || (idx >= maxi));
+    const StorageApi::sDriveInfo& drv = scan.darr[idx];
+    setLog(cs, QString(StorageApi::ToShortString(drv).c_str()));
+    QString pstr = QString::fromStdWString(StorageApi::ToWideString(drv.pi));
+    appendLog(cs, "Partitions: \n" + pstr);
+}
+
+// ----------------------------------------------------------------------------
+
+void MainWindow::showWidget_ViewSmart()
+{
+    DEF_APP_DATA();
+    QPlainTextEdit* cs = ctrl.sm.Console;
+    int idx = ctrl.DrvList->currentRow();
+    int maxi = scan.darr.size();
+    RETURN_NO_DRIVE_FOUND_IF(!maxi);
+    RETURN_NO_SEL_DRIVE_IF(maxi && (idx < 0));
+    RETURN_WRONG_INDEX_IF((idx < 0) || (idx >= maxi));
+    const StorageApi::sDriveInfo& drv = scan.darr[idx];
+    RETURN_NOT_SUPPORT_IF(!drv.id.features.smart);
+    setLog(cs, QString(StorageApi::ToString(drv.si, true, 2).c_str()));
 }
 
 // ----------------------------------------------------------------------------
@@ -430,9 +602,24 @@ void SelfTestThreadFunc(void* param) {
     StorageApi::SelfTest(cmn.drvname, 0, &cmn.progress);
 }
 
-void MainWindow::handleSelfTest()
+void MainWindow::handleSelfTestMode0() {}
+void MainWindow::handleSelfTestMode1() {}
+void MainWindow::handleSelfTestMode2()  {}
+void MainWindow::handleSelfTestStop() {}
+void MainWindow::handleUpdateFwStart() {}
+void MainWindow::handleUpdateFwStop() {}
+void MainWindow::handleTrimDriveStart() {}
+void MainWindow::handleTrimDriveStop() {}
+void MainWindow::handleSecureWipeStart() {}
+void MainWindow::handleSecureWipeStop() {}
+void MainWindow::handleDebugRead() {}
+void MainWindow::handleDebugFill() {}
+void MainWindow::handleDebugStop() {}
+
+void MainWindow::showWidget_SelfTest()
 {
     DEF_APP_DATA();
+    QPlainTextEdit* cs = ctrl.st.Console;
 
     int idx = ctrl.DrvList->currentRow();
     int maxi = scan.darr.size();
@@ -441,7 +628,7 @@ void MainWindow::handleSelfTest()
     RETURN_WRONG_INDEX_IF((idx < 0) || (idx >= maxi));
     const StorageApi::sDriveInfo& drv = scan.darr[idx];
     RETURN_NOT_SUPPORT_IF(!drv.id.features.test);
-    setLog("Executing Self-Test on drive " + QString(drv.name.c_str()));
+    setLog(cs, "Executing Self-Test on drive " + QString(drv.name.c_str()));
 
     enableGui(false);
     cmn.initCommonParam(drv.name);
@@ -453,7 +640,7 @@ void MainWindow::handleSelfTest()
     sstr << "SelfTest Done! Return Code: "
          << StorageApi::ToString(cmn.progress.rval) << std::endl
          << "Report: " << std::endl << info;
-    setLog(QString(sstr.str().c_str()));
+    setLog(cs, QString(sstr.str().c_str()));
     enableGui(true);
 }
 
@@ -462,34 +649,6 @@ void MainWindow::handleSelfTest()
 void SetopThreadFunc(void* param) {
     DEF_APP_DATA(); (void) param;
     StorageApi::SetOverProvision(cmn.drvname, cmn.factor, &cmn.progress);
-}
-
-void MainWindow::handleSetOverProvision()
-{
-    DEF_APP_DATA();
-
-    int idx = ctrl.DrvList->currentRow();
-    int maxi = scan.darr.size();
-    RETURN_NO_DRIVE_FOUND_IF(!maxi);
-    RETURN_NO_SEL_DRIVE_IF(maxi && (idx < 0));
-    RETURN_WRONG_INDEX_IF((idx < 0) || (idx >= maxi));
-    const StorageApi::sDriveInfo& drv = scan.darr[idx];
-    RETURN_NOT_SUPPORT_IF(!drv.id.features.provision);
-    StorageApi::U32 opfactor = 20;
-    setLog("Setting Over-Provision on drive " + QString(drv.name.c_str()));
-
-    enableGui(false);
-    cmn.initSetopParam(drv.name, opfactor);
-    startWorker(SetopThreadFunc, &cmn);
-    waitProcessing(cmn.progress);
-
-    std::stringstream sstr;
-    std::string info = *const_cast<std::string*>(&cmn.progress.info);
-    sstr << "Setting Over-Provision Done! Return Code: "
-         << StorageApi::ToString(cmn.progress.rval) << std::endl
-         << "Report: " << std::endl << info;
-    setLog(QString(sstr.str().c_str()));
-    enableGui(true);
 }
 
 // ----------------------------------------------------------------------------
@@ -527,9 +686,74 @@ void DiskCloneThreadFunc(void* param) {
     StorageApi::CloneDrive(cmn.dstname, cmn.drvname, cmn.partarr, &cmn.progress);
 }
 
-void MainWindow::handleCloneDrive()
+static void FillTargetDrive(QComboBox* box, tDriveArray& darr, U32 cidx) {
+    box->clear();
+    for (U32 i = 0, maxi = darr.size(); i < maxi; i++) {
+        if (i == cidx) continue;
+        sDriveInfo& drv = darr[i];
+        stringstream sstr;
+        sstr << drv.id.model;
+        box->addItem(QString(sstr.str().c_str()));
+    }
+}
+
+#include "PartWidget.h"
+
+static void ShowDrivePartition(QListWidget* box, const sDriveInfo& drv) {
+    box->clear();
+    for (int i = 0, maxi = drv.pi.parr.size(); i < maxi; i++) {
+        const sPartition& p = drv.pi.parr[i];
+        QListWidgetItem* item = new QListWidgetItem();
+        PartWidget* pw = new PartWidget(); pw->setPart(p);
+        item->setSizeHint(pw->sizeHint());
+        box->addItem(item); box->setItemWidget(item, pw);
+    }
+}
+
+static bool GetSourcePartArray(QListWidget* box, tAddrArray& pa) {
+    pa.clear();
+    for (int i = 0, maxi = box->count(); i < maxi; i++) {
+        QListWidgetItem* item = box->item(i);
+        PartWidget* pw = (PartWidget*) box->itemWidget(item);
+        tPartAddr addr; if (!pw->getPartInfo(addr)) continue;
+        pa.push_back(addr);
+    }
+    return pa.max_size() != 0;
+}
+
+static bool GetTargetDriveInfo(QComboBox* box, string& dst) {
+    if (!box->count()) return false;
+    dst = box->currentText().toStdString();
+    return true;
+}
+
+void MainWindow::showWidget_DiskClone()
+{
+    // Show all partitions on selected drive
+
+    DEF_APP_DATA();
+    QPlainTextEdit* cs = ctrl.dc.Console;
+
+    int idx = ctrl.DrvList->currentRow();
+    int maxi = scan.darr.size();
+    RETURN_NO_DRIVE_FOUND_IF(!maxi);
+    RETURN_NO_SEL_DRIVE_IF(maxi && (idx < 0));
+    RETURN_WRONG_INDEX_IF((idx < 0) || (idx >= maxi));
+    RETURN_NO_TARGET_DRIVE_IF(maxi <= 1);
+
+    const StorageApi::sDriveInfo& drv = scan.darr[idx];
+
+    // Show list of partitions of current drive
+    ShowDrivePartition(ctrl.dc.List, drv);
+
+    // Fill Target with remaining drives
+    FillTargetDrive(ctrl.dc.Target, scan.darr, idx);
+}
+
+void MainWindow::handleDiskCloneStart()
 {
     DEF_APP_DATA();
+    QPlainTextEdit* cs = ctrl.dc.Console;
 
     int idx = ctrl.DrvList->currentRow();
     int maxi = scan.darr.size();
@@ -541,14 +765,14 @@ void MainWindow::handleCloneDrive()
     // Generate random params for DiskClone
     // In the real code, user will select these params from GUI
     const StorageApi::sDriveInfo& drv = scan.darr[idx];
-    const StorageApi::sDriveInfo& dst = scan.darr[(idx + 1) % maxi];
-    StorageApi::tAddrArray parts; GetRamdomParts(drv, parts);
+    tAddrArray pa;  GetSourcePartArray(ctrl.dc.List, pa);
+    string dstname; GetTargetDriveInfo(ctrl.dc.Target, dstname);
 
     // Now, clone partitions in parr to new target drive
-    setLog("Cloning Drive " + QString(drv.name.c_str()));
+    setLog(cs, "Cloning Drive " + QString(drv.name.c_str()));
 
     enableGui(false);
-    cmn.initCloneParam(drv.name, parts, dst.name);
+    cmn.initCloneParam(drv.name, pa, dstname);
 
     if (1) {
         // Should not dump message in worker thread, so put it here
@@ -561,7 +785,7 @@ void MainWindow::handleCloneDrive()
             const StorageApi::tPartAddr& item = arr[i];
             sstr << "Section(" << item.first << "," << item.second << ")" << std::endl;
         }
-        appendLog(sstr.str().c_str());
+        appendLog(cs, sstr.str().c_str());
     }
 
     startWorker(DiskCloneThreadFunc, &cmn);
@@ -569,11 +793,16 @@ void MainWindow::handleCloneDrive()
 
     std::stringstream sstr;
     std::string info = *const_cast<std::string*>(&cmn.progress.info);
-    sstr << "Optimizing Drive Done! Return Code: "
+    sstr << "Clone Drive Done! Return Code: "
          << StorageApi::ToString(cmn.progress.rval) << std::endl
          << "Report: " << std::endl << info;
-    setLog(QString(sstr.str().c_str()));
+    appendLog(cs, QString(sstr.str().c_str()));
     enableGui(true);
+}
+
+void MainWindow::handleDiskCloneStop()
+{
+    handleCommonStop();
 }
 
 // ----------------------------------------------------------------------------
@@ -583,9 +812,10 @@ void TrimDriveThreadFunc(void* param) {
     StorageApi::OptimizeDrive(cmn.drvname, &cmn.progress);
 }
 
-void MainWindow::handleTrimDrive()
+void MainWindow::showWidget_TrimDrive()
 {
     DEF_APP_DATA();
+    QPlainTextEdit* cs = ctrl.td.Console;
 
     int idx = ctrl.DrvList->currentRow();
     int maxi = scan.darr.size();
@@ -594,7 +824,7 @@ void MainWindow::handleTrimDrive()
     RETURN_WRONG_INDEX_IF((idx < 0) || (idx >= maxi));
     const StorageApi::sDriveInfo& drv = scan.darr[idx];
     RETURN_NOT_SUPPORT_IF(!drv.id.features.trim);
-    setLog("Optimizing Drive " + QString(drv.name.c_str()));
+    setLog(cs, "Optimizing Drive " + QString(drv.name.c_str()));
 
     enableGui(false);
     cmn.initCommonParam(drv.name);
@@ -606,7 +836,7 @@ void MainWindow::handleTrimDrive()
     sstr << "Optimizing Drive Done! Return Code: "
          << StorageApi::ToString(cmn.progress.rval) << std::endl
          << "Report: " << std::endl << info;
-    setLog(QString(sstr.str().c_str()));
+    setLog(cs, QString(sstr.str().c_str()));
     enableGui(true);
 }
 
@@ -617,9 +847,10 @@ void SecureEraseThreadFunc(void* param) {
     StorageApi::SecureErase(cmn.drvname, &cmn.progress);
 }
 
-void MainWindow::handleEraseDrive()
+void MainWindow::showWidget_SecureWipe()
 {
     DEF_APP_DATA();
+    QPlainTextEdit* cs = ctrl.sw.Console;
 
     int idx = ctrl.DrvList->currentRow();
     int maxi = scan.darr.size();
@@ -628,7 +859,7 @@ void MainWindow::handleEraseDrive()
     RETURN_WRONG_INDEX_IF((idx < 0) || (idx >= maxi));
     const StorageApi::sDriveInfo& drv = scan.darr[idx];
     RETURN_NOT_SUPPORT_IF(!drv.id.features.erase);
-    setLog("Secure Wipe Drive " + QString(drv.name.c_str()));
+    setLog(cs, "Secure Wipe Drive " + QString(drv.name.c_str()));
 
     enableGui(false);
     cmn.initCommonParam(drv.name);
@@ -640,7 +871,7 @@ void MainWindow::handleEraseDrive()
     sstr << "Secure Wipe Drive Done! Return Code: "
          << StorageApi::ToString(cmn.progress.rval) << std::endl
          << "Report: " << std::endl << info;
-    setLog(QString(sstr.str().c_str()));
+    setLog(cs, QString(sstr.str().c_str()));
     enableGui(true);
 }
 
@@ -651,9 +882,10 @@ void UpdateFirmwareThreadFunc(void* param) {
     StorageApi::UpdateFirmware(cmn.drvname, cmn.buffer, cmn.bufsize, &cmn.progress);
 }
 
-void MainWindow::handleUpdateFirmware()
+void MainWindow::showWidget_UpdateFw()
 {
     DEF_APP_DATA();
+    QPlainTextEdit* cs = ctrl.uf.Console;
 
     int idx = ctrl.DrvList->currentRow();
     int maxi = scan.darr.size();
@@ -662,7 +894,7 @@ void MainWindow::handleUpdateFirmware()
     RETURN_WRONG_INDEX_IF((idx < 0) || (idx >= maxi));
     const StorageApi::sDriveInfo& drv = scan.darr[idx];
     RETURN_NOT_SUPPORT_IF(!drv.id.features.dlcode);
-    setLog("Update Firmware Drive " + QString(drv.name.c_str()));
+    setLog(cs, "Update Firmware Drive " + QString(drv.name.c_str()));
 
     enableGui(false);
     cmn.initCommonParam(drv.name);
@@ -674,25 +906,16 @@ void MainWindow::handleUpdateFirmware()
     sstr << "Update Firmware on Drive Done! Return Code: "
          << StorageApi::ToString(cmn.progress.rval) << std::endl
          << "Report: " << std::endl << info;
-    setLog(QString(sstr.str().c_str()));
+    setLog(cs, QString(sstr.str().c_str()));
     enableGui(true);
 }
 
 // ----------------------------------------------------------------------------
 
-void MainWindow::handleDebug()
+void MainWindow::showWidget_Debug()
 {
     DEF_APP_DATA();
-
-    // appendLog("Debug Started...");
-    // scan.darr.clear();
-    // scan.progress.reset();
-    // appendLog("Debug Done!");
-
-    // StorageApi::HDL hdl;
-    // if (StorageApi::RET_OK != StorageApi::Open("\\\\.\\PhysicalDrive0", hdl)) {
-    //     appendLog("Cannot open device"); return;
-    // }
+    QPlainTextEdit* cs = ctrl.db.Console;
 
     // Try to read partition info on all drives
     std::stringstream sstr;
@@ -711,7 +934,7 @@ void MainWindow::handleDebug()
         sstr << StorageApi::ToString(pi) << std::endl;
     }
 
-    setLog(sstr.str().c_str());
+    setLog(cs, sstr.str().c_str());
 }
 
 // ----------------------------------------------------------------------------
@@ -849,6 +1072,7 @@ void ReadDriveThreadFunc(void* param) {
 void MainWindow::handleReadDrive()
 {
     DEF_APP_DATA();
+    QPlainTextEdit* cs = ctrl.db.Console;
 
     int idx = ctrl.DrvList->currentRow();
     int maxi = scan.darr.size();
@@ -857,7 +1081,7 @@ void MainWindow::handleReadDrive()
     RETURN_WRONG_INDEX_IF((idx < 0) || (idx >= maxi));
     const StorageApi::sDriveInfo& drv = scan.darr[idx];
     RETURN_NOT_SUPPORT_IF(!drv.id.features.lbamode);
-    setLog("Read (LBA48B) on drive " + QString(drv.name.c_str()));
+    setLog(cs, "Read (LBA48B) on drive " + QString(drv.name.c_str()));
 
     enableGui(false);
     cmn.initCommonParam(drv.name);
@@ -869,7 +1093,7 @@ void MainWindow::handleReadDrive()
     sstr << "Debug Done! Return Code: "
          << StorageApi::ToString(cmn.progress.rval) << std::endl
          << "Report: " << std::endl << info;
-    setLog(QString(sstr.str().c_str()));
+    setLog(cs, QString(sstr.str().c_str()));
     enableGui(true);
 }
 
@@ -927,6 +1151,7 @@ void FillDriveThreadFunc(void* param) {
 void MainWindow::handleFillDrive()
 {
     DEF_APP_DATA();
+    QPlainTextEdit* cs = ctrl.db.Console;
 
     int idx = ctrl.DrvList->currentRow();
     int maxi = scan.darr.size();
@@ -935,7 +1160,7 @@ void MainWindow::handleFillDrive()
     RETURN_WRONG_INDEX_IF((idx < 0) || (idx >= maxi));
     const StorageApi::sDriveInfo& drv = scan.darr[idx];
     RETURN_NOT_SUPPORT_IF(!drv.id.features.lbamode);
-    setLog("Fill drive with pattern " + QString(drv.name.c_str()));
+    setLog(cs, "Fill drive with pattern " + QString(drv.name.c_str()));
 
     enableGui(false);
     cmn.initCommonParam(drv.name);
@@ -947,7 +1172,7 @@ void MainWindow::handleFillDrive()
     sstr << "Debug Done! Return Code: "
          << StorageApi::ToString(cmn.progress.rval) << std::endl
          << "Report: " << std::endl << info;
-    setLog(QString(sstr.str().c_str()));
+    setLog(cs, QString(sstr.str().c_str()));
     enableGui(true);
 }
 

@@ -46,7 +46,7 @@ public:
         sATTRPARAM(const std::string& name, const std::string& note, bool show) {Name = name; Note = note; Show = show; }
     };
 
-    typedef std::map<U8, sATTRPARAM> tATTRNAMEMAP;
+    typedef std::map<U16, sATTRPARAM> tATTRNAMEMAP;
     typedef std::map<std::string, eIDENTKEY> tIDENTKEYMAP;
 
     struct sUtilData
@@ -61,11 +61,9 @@ public:
     };
     
 public:
-    static bool LookupAttributeName(U8 id, std::string& name);
-    static bool LookupAttributeNote(U8 id, std::string& note);
-    static bool LookupAttributeText(U8 id, std::string&, std::string&);   // name:note
-    static void LookupAttributeList(std::vector<std::string>& attrList);            // name
-    static void LookupAttributeList(std::vector<std::pair<U8, std::string> >& attrList); // id:name
+    static bool LookupAttributeName(U16 id, std::string& name);
+    static bool LookupAttributeNote(U16 id, std::string& note);
+    static bool LookupAttributeText(U16 id, std::string&, std::string&);   // name:note
     static double LookupNandEndurance(const std::string& serialNum);
     static bool LookupIdentifyKey(const std::string& str, eIDENTKEY& key);
     

@@ -6,7 +6,7 @@
 #include "CmdBase.h"
 
 #include <windows.h>
-#include <winioctl.h>
+#include "winioctl.h"
 #include <ntddscsi.h>
 #include <nvme.h>
 
@@ -483,7 +483,8 @@ class NvmeUtil
 public:
     static BOOL IdentifyNamespace(HANDLE hDevice, DWORD dwNSID, PNVME_IDENTIFY_NAMESPACE_DATA pNamespaceIdentify);
     static BOOL IdentifyController(HANDLE hDevice, PNVME_IDENTIFY_CONTROLLER_DATA pControllerIdentify);
-    static BOOL GetSMARTHealthInfoLog(HANDLE hDevice, PNVME_HEALTH_INFO_LOG pHealthInfoLog);
+    static BOOL GetHealthInfoLog(HANDLE hDevice, PNVME_HEALTH_INFO_LOG pHealthInfoLog);
+    static BOOL GetHealthInfoLog(HANDLE hDevice, DWORD dwNSID, PNVME_HEALTH_INFO_LOG hlog);
     static BOOL GetSelfTestLog(HANDLE hDevice, PNVME_DEVICE_SELF_TEST_LOG pSelfTestLog);
     static BOOL DeviceSelfTest(HANDLE hDevice, eDeviceSelftestCode selftestCode);
     static BOOL IdentifyActiveNSIDList(HANDLE hDevice, PNVME_IDENTIFY_ACTIVE_NAMESPACE_LIST pNsidList);

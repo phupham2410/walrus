@@ -14,12 +14,17 @@ namespace ApiUtil {
     void ConvertIdentify(const sIDENTIFY& src, StorageApi::sIdentify& dst);
     void UpdateDriveInfo(const sDRVINFO& src, StorageApi::sDriveInfo& dst);
 
-    bool SetSmartRaw(StorageApi::tAttrMap& smap, U8 id, U32 lo, U32 hi);
-    bool SetSmartRaw(StorageApi::tAttrMap& smap, U8 id, U32 lo, U32 hi, U32 thr);
-    bool GetSmartValue(const StorageApi::tAttrMap& smap, U8 id, U8& val);
-    bool GetSmartRaw(const StorageApi::tAttrMap& smap, U8 id, U32& lo, U32& hi);
-    bool GetSmartAttr(const StorageApi::tAttrMap& smap, U8 id, StorageApi::sSmartAttr& attr);
-    StorageApi::sSmartAttr& GetSmartAttrRef(StorageApi::tAttrMap&, U8 id);
+    bool SetSmartRaw(StorageApi::tAttrMap& smap, U16 id, U32 lo, U32 hi);
+    bool GetSmartValue(const StorageApi::tAttrMap& smap, U16 id, U8& val);
+    bool GetSmartRaw(const StorageApi::tAttrMap& smap, U16 id, U32& lo, U32& hi);
+    bool GetSmartAttr(const StorageApi::tAttrMap& smap, U16 id, StorageApi::sSmartAttr& attr);
+    StorageApi::sSmartAttr& GetSmartAttrRef(StorageApi::tAttrMap&, U16 id);
+
+    StorageApi::STR ToAttrValueString(U16 id, U32 loraw, U32 hiraw);
+    StorageApi::STR ToNvmeAttrString(const StorageApi::sSmartAttr& sa, const char* sep = " ");
+    StorageApi::STR ToAtaAttrString(const StorageApi::sSmartAttr& sa, const char* sep = " ");
+
+    bool IsTrimSupported(StorageApi::HDL hdl);
 }
 
 #endif

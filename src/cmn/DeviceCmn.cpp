@@ -437,9 +437,8 @@ void DeviceMgr::ParseIdentifyInfo(unsigned char* idSector, string driveName, sID
             (idSector[204]      );
 
         // UINT64 usercap = ((((UINT64) usercap_high << 32) | usercap_low) << 9 ) / 100000000;
-        // driveInfo.UserCapacity = (double) usercap / 10;
-
-        driveInfo.UserCapacity = 32 * usercap_high * pow(1.6, 9) + usercap_low * pow(0.2, 9);
+        // driveInfo.UserCapacity = 32 * usercap_high * pow(1.6, 9) + usercap_low * pow(0.2, 9);
+        driveInfo.UserCapacity = (((U64) usercap_high << 32) | ((U64) usercap_low));
     }
 
     #define DEF_WORD(idx) U16 w##idx = GET_WORD(idSector, idx)

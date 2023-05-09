@@ -142,28 +142,28 @@ static tDriveArray gDrvArr;
 // Static utilities
 
 // Similar to ApiUtil's
-static bool GetSmartAttr(const tAttrMap& smap, U8 id, sSmartAttr& attr) {
+static bool GetSmartAttr(const tAttrMap& smap, U16 id, sSmartAttr& attr) {
     tAttrConstIter iter = smap.find(id);
     if (iter == smap.end()) return false;
     attr = iter->second; return true;
 }
 
 // Similar to ApiUtil's
-static bool GetSmartRaw(const tAttrMap& smap, U8 id, U32& lo, U32& hi) {
+static bool GetSmartRaw(const tAttrMap& smap, U16 id, U32& lo, U32& hi) {
     sSmartAttr attr;
     if (!GetSmartAttr(smap, id, attr)) return false;
     lo = attr.loraw; hi = attr.hiraw; return true;
 }
 
 // Similar to ApiUtil's
-static bool GetSmartValue(const tAttrMap& smap, U8 id, U8& val) {
+static bool GetSmartValue(const tAttrMap& smap, U16 id, U8& val) {
     sSmartAttr attr;
     if (!GetSmartAttr(smap, id, attr)) return false;
     val = attr.value; return true;
 }
 
 // Similar to ApiUtil's
-static bool SetSmartRaw(tAttrMap& smap, U8 id, U32 lo, U32 hi) {
+static bool SetSmartRaw(tAttrMap& smap, U16 id, U32 lo, U32 hi) {
     tAttrIter iter = smap.find(id);
     if (iter == smap.end()) return false;
     sSmartAttr& attr = iter->second;

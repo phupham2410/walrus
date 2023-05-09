@@ -206,89 +206,72 @@ exit:
     return result;
 }
 
-BOOL NvmeUtil::GetSMARTHealthInfoLog(HANDLE hDevice, PNVME_HEALTH_INFO_LOG pHealthInfoLog){
+BOOL NvmeUtil::GetHealthInfoLog(HANDLE hDevice, DWORD dwNSID, PNVME_HEALTH_INFO_LOG hlog){
     BOOL    result = FALSE;
     PVOID   buffer = NULL;
-    ULONG   bufferLength = 0;
-    ULONG   returnedLength = 0;
+    ULONG   bufsize = 0;
+    ULONG   retsize = 0;
 
     PSTORAGE_PROPERTY_QUERY query = NULL;
-    PSTORAGE_PROTOCOL_SPECIFIC_DATA protocolData = NULL;
-    PSTORAGE_PROTOCOL_DATA_DESCRIPTOR protocolDataDescr = NULL;
+    PSTORAGE_PROTOCOL_SPECIFIC_DATA pdata = NULL;
+    PSTORAGE_PROTOCOL_DATA_DESCRIPTOR pdesc = NULL;
 
-    if (NULL == pHealthInfoLog) {
-        printf("GetSMARTHealthInfoLog: invalid input.\n");
-        goto exit;
-    }
+    if (NULL == hlog) goto exit;
 
     // Allocate buffer for use.
-    bufferLength = offsetof(STORAGE_PROPERTY_QUERY, AdditionalParameters)
-        + sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA)
-        + sizeof(NVME_HEALTH_INFO_LOG);
-    buffer = malloc(bufferLength);
+    bufsize = offsetof(STORAGE_PROPERTY_QUERY, AdditionalParameters) +
+              sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA) +
+              sizeof(NVME_HEALTH_INFO_LOG);
+    buffer = malloc(bufsize);
 
-    if (buffer == NULL) {
-        printf("GetSMARTHealthInfoLog: allocate buffer failed.\n");
-        goto exit;
-    }
-
-    ZeroMemory(buffer, bufferLength);
+    if (buffer == NULL) goto exit;
+    ZeroMemory(buffer, bufsize);
 
     query = (PSTORAGE_PROPERTY_QUERY)buffer;
-    protocolDataDescr = (PSTORAGE_PROTOCOL_DATA_DESCRIPTOR)buffer;
-    protocolData = (PSTORAGE_PROTOCOL_SPECIFIC_DATA)query->AdditionalParameters;
+    pdesc = (PSTORAGE_PROTOCOL_DATA_DESCRIPTOR)buffer;
+    pdata = (PSTORAGE_PROTOCOL_SPECIFIC_DATA)query->AdditionalParameters;
 
     query->PropertyId = StorageDeviceProtocolSpecificProperty;
     query->QueryType = PropertyStandardQuery;
 
-    protocolData->ProtocolType = ProtocolTypeNvme;
-    protocolData->DataType = NVMeDataTypeLogPage;
-    protocolData->ProtocolDataRequestValue = NVME_LOG_PAGE_HEALTH_INFO;
-    protocolData->ProtocolDataRequestSubValue = NVME_NAMESPACE_ALL;
-    protocolData->ProtocolDataOffset = sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA);
-    protocolData->ProtocolDataLength = sizeof(NVME_HEALTH_INFO_LOG);
+    pdata->ProtocolType = ProtocolTypeNvme;
+    pdata->DataType = NVMeDataTypeLogPage;
+    pdata->ProtocolDataRequestValue = NVME_LOG_PAGE_HEALTH_INFO;
+    pdata->ProtocolDataRequestSubValue = dwNSID;
+    pdata->ProtocolDataOffset = sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA);
+    pdata->ProtocolDataLength = sizeof(NVME_HEALTH_INFO_LOG);
 
-    // Send request down.  
-    result = DeviceIoControl(hDevice,
-        IOCTL_STORAGE_QUERY_PROPERTY,
-        buffer,
-        bufferLength,
-        buffer,
-        bufferLength,
-        &returnedLength,
-        NULL
-    );
+    // Send request down.
+    result = DeviceIoControl(hDevice, IOCTL_STORAGE_QUERY_PROPERTY,
+                             buffer, bufsize, buffer, bufsize, &retsize, NULL);
 
     if (!result) goto exit;
 
     // Validate the returned data.
-    if ((protocolDataDescr->Version != sizeof(STORAGE_PROTOCOL_DATA_DESCRIPTOR)) ||
-        (protocolDataDescr->Size != sizeof(STORAGE_PROTOCOL_DATA_DESCRIPTOR))) {
-        printf("GetSMARTHealthInfoLog: Data Descriptor Header is not valid.\n");
-        result = FALSE;
-        goto exit;
+    if ((pdesc->Version != sizeof(STORAGE_PROTOCOL_DATA_DESCRIPTOR)) ||
+        (pdesc->Size != sizeof(STORAGE_PROTOCOL_DATA_DESCRIPTOR))) {
+        result = FALSE; goto exit;
     }
 
-    protocolData = &protocolDataDescr->ProtocolSpecificData;
+    pdata = &pdesc->ProtocolSpecificData;
 
-    if ((protocolData->ProtocolDataOffset < sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA)) ||
-        (protocolData->ProtocolDataLength < sizeof(NVME_HEALTH_INFO_LOG))) {
-        printf("IdentifyController: ProtocolData Offset/Length is not valid.\n");
-        result = FALSE;
-        goto exit;
+    if ((pdata->ProtocolDataOffset < sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA)) ||
+        (pdata->ProtocolDataLength < sizeof(NVME_HEALTH_INFO_LOG))) {
+        result = FALSE; goto exit;
     }
 
-    memcpy(pHealthInfoLog, (PCHAR)protocolData + protocolData->ProtocolDataOffset, sizeof(NVME_HEALTH_INFO_LOG));
- 
-    result = TRUE; 
+    memcpy(hlog, (PCHAR)pdata + pdata->ProtocolDataOffset, sizeof(NVME_HEALTH_INFO_LOG));
+
+    result = TRUE;
 exit:
-    if (buffer != NULL)
-    {
-        free(buffer);
-    }
-
+    if (buffer != NULL) free(buffer);
     return result;
 }
+
+BOOL NvmeUtil::GetHealthInfoLog(HANDLE hDevice, PNVME_HEALTH_INFO_LOG pHealthInfoLog){
+    return GetHealthInfoLog(hDevice, NVME_NAMESPACE_ALL, pHealthInfoLog);
+}
+
 
 BOOL NvmeUtil::GetSelfTestLog(HANDLE hDevice, PNVME_DEVICE_SELF_TEST_LOG pSelfTestLog) {
     BOOL    result = FALSE;
@@ -373,6 +356,7 @@ exit:
 
     return result;
 }
+
 
 BOOL NvmeUtil::DeviceSelfTest(HANDLE hDevice, eDeviceSelftestCode selftestCode) {
     BOOL  result = FALSE;
@@ -1123,5 +1107,5 @@ BOOL NvmeUtil::win10FW_Active(HANDLE hHandle, PSTORAGE_HW_FIRMWARE_INFO fwdlInfo
     }
 
     return TRUE;
-
 }
+

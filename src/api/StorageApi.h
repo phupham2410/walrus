@@ -60,7 +60,7 @@ namespace StorageApi {
         U8 security;          // (Y/N) Supported Security feature
         U8 ncq;               // (Y/N) Supported NCQ mode
         U8 test;              // (Y/N) Supported SelfTest
-        U8 erase;             // (Y/N) Supported SecureErase
+        U8 erase;             // (Y/N) Supported SecureErase Modes
         U8 dlcode;            // (Y/N) Supported Download Microcode
 
         void reset();
@@ -68,14 +68,14 @@ namespace StorageApi {
         sFeature(const U8* val);
     };
 
-    typedef std::pair<U64, U64> tPartAddr;      // pair<start, count>
+    typedef std::pair<U64, U64> tPartAddr;      // pair<start byte, byte count>
     typedef std::vector<tPartAddr> tAddrArray;  // List of partition's position
     typedef const tAddrArray tConstAddrArray;   // Constant vector
 
     struct sPartition {
         WSTR name;            // Partition name
         U32 index;            // Partition index
-        F64 cap;              // Capacity in GB (count * 512 bytes)
+        U64 cap;              // Capacity in sector
         tPartAddr addr;       // Partition address (start lba, sector count)
 
         void reset();
@@ -99,19 +99,27 @@ namespace StorageApi {
         STR serial;         // Serial string
         STR version;        // Firmware version
         STR confid;         // Configuration ID
-        F64 cap;            // Capacity in GB
+        U64 cap;            // Capacity in sector
         sFeature  features; // Supported features
 
         void reset();
         sIdentify();
     };
 
+    enum eAttrType {
+        AT_ATA  = 0x00,
+        AT_NVME = 0x01,
+        AT_INVALID = 0xFF,
+    };
+
     struct sSmartAttr {
-        U8  id, value;
-        U8 worst, threshold;
+        U16 id;
+        U8 value, worst, threshold;
         U32 loraw, hiraw;
         STR name;
         STR note;
+
+        eAttrType type;
 
         void reset();
         sSmartAttr();
@@ -137,9 +145,11 @@ namespace StorageApi {
         sPartInfo  pi;      // Partitions info
 
         S64 temp;
-        U64 tread;          // total host read
-        U64 twrtn;          // total host write
-        U8  bustype;
+        U64 tread;          // total host read in sector
+        U64 twrtn;          // total host write in sector
+        U64 health;         // remaining life percentage
+
+        U8  bustype;        // Windows' STORAGE_BUS_TYPE
         U32 maxtfsec;       // Max transfer size in sector
 
         void reset();
@@ -152,8 +162,8 @@ namespace StorageApi {
     struct sProgress {
         bool ready;   // ready to be read from client thread
         bool stop;    // stop request from client thread
-        U32 workload; // max workload of current task
-        U32 progress; // current progress ( 0 -> workload)
+        U64 workload; // max workload of current task
+        U64 progress; // current progress ( 0 -> workload)
         STR info;     // output info of some operation
         eRetCode rval;// return value
         bool done;    // complete status of current task
@@ -204,17 +214,18 @@ namespace StorageApi {
     // ToString utilities
     STR ToString(eRetCode code);
     STR ToString(const sDriveInfo& drv, U32 indent = 0);
-    STR ToString(const sSmartInfo& sm, U32 indent = 0);
     STR ToString(const sIdentify& id, U32 indent = 0);
     STR ToString(const sFeature& ftr, U32 indent = 0);
-    STR ToString(const sSmartAttr& attr, U32 indent = 0);
     STR ToString(const U8* bufptr, U32 bufsize);
     STR ToString(const sPartition& pt, U32 indent = 0);
     STR ToString(const sPartInfo& pi, U32 indent = 0);
+    STR ToString(const sSmartAttr& attr, U32 indent = 0);
+    STR ToString(const sSmartInfo& sm, bool hdr = false, U32 indent = 0);
 
     WSTR ToWideString(const sPartition& pt, U32 indent = 0);
     WSTR ToWideString(const sPartInfo& pi, U32 indent = 0);
 
+    STR ToCsvString(const sSmartAttr& attr);
     STR ToShortString(const sDriveInfo& drv, U32 indent = 0);
 
     // Get list of plugged-in drives

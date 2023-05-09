@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <windows.h>
 
+#include "ApiUtil.h"
 #include "HexFrmt.h"
 #include "StorageApi.h"
 
@@ -169,6 +170,11 @@ static STR ToBusTypeString(U32 bustype) {
         MAP_ITEM(BusTypeMmc              , 0xD );
         MAP_ITEM(BusTypeVirtual          , 0xE );
         MAP_ITEM(BusTypeFileBackedVirtual, 0xF );
+        MAP_ITEM(BusTypeSpaces           , 0x10);
+        MAP_ITEM(BusTypeNvme             , 0x11);
+        MAP_ITEM(BusTypeSCM              , 0x12);
+        MAP_ITEM(BusTypeUfs              , 0x13);
+        MAP_ITEM(BusTypeMax              , 0x14);
         MAP_ITEM(BusTypeMaxReserved      , 0x7F);
     }
     #undef MAP_ITEM
@@ -181,14 +187,14 @@ STR StorageApi::ToString(const StorageApi::sFeature& ft, U32 indent) {
         sstr << prefix << name << ": " << (flag ? "Yes" : "No"); if (e) sstr << ENDL
     #define MAP_ITEM(e, name, value) \
         sstr << prefix << name << ": " << (U32) value; if (e) sstr << ENDL
-    MAP_ITEM(1, "ATA Version", ft.ataversion);
-    MAP_FLAG(1, "LBA 48B", ft.lbamode);
-    MAP_FLAG(1, "DMA", ft.dma);
-    MAP_FLAG(1, "Over Provision", ft.provision);
+    // MAP_ITEM(1, "ATA Version", ft.ataversion);
+    // MAP_FLAG(1, "LBA 48B", ft.lbamode);
+    // MAP_FLAG(1, "DMA", ft.dma);
+    // MAP_FLAG(1, "Over Provision", ft.provision);
+    // MAP_FLAG(1, "NCQ", ft.ncq);
+    // MAP_FLAG(1, "Security", ft.security);
     MAP_FLAG(1, "TRIM Command", ft.trim);
     MAP_FLAG(1, "S.M.A.R.T.", ft.smart);
-    MAP_FLAG(1, "Security", ft.security);
-    MAP_FLAG(1, "NCQ", ft.ncq);
     MAP_FLAG(1, "Self Test", ft.test);
     MAP_FLAG(1, "Secure Wipe", ft.erase);
     MAP_FLAG(0, "Firmware Upgrade", ft.dlcode);
@@ -231,26 +237,42 @@ STR StorageApi::ToString(const StorageApi::sIdentify& id, U32 indent) {
     MAP_ITEM(0,1, "Serial"          , id.serial);
     MAP_ITEM(0,1, "Firmware Version", id.version);
     MAP_ITEM(0,1, "Configuration ID", id.confid);
-    MAP_ITEM(0,1, "Capacity(GB)"    , id.cap);
+    MAP_ITEM(0,1, "Capacity(GB)"    , (id.cap >> 21));
     MAP_ITEM(1,1, "Features"        , ToString(id.features, sub));
     #undef MAP_ITEM
     return sstr.str();
 }
 
 STR StorageApi::ToString(const StorageApi::sSmartAttr& sa, U32 indent) {
-    char buffer[2048]; STR prefix (indent, ' ');
-    sprintf(buffer, "%02X %30s %3d %3d %06d %06d %3d %s",
-            sa.id, sa.name.c_str(), sa.value, sa.threshold,
-            sa.loraw, sa.hiraw, sa.worst, sa.note.c_str());
-    return prefix + std::string(buffer);
+    STR prefix (indent, ' '), astr;
+    switch(sa.type) {
+        case AT_ATA: astr = ApiUtil::ToAtaAttrString(sa); break;
+        case AT_NVME: astr = ApiUtil::ToNvmeAttrString(sa); break;
+        default: astr = "Unknown_Attribute_Type"; break;
+    }
+    return prefix + astr;
 }
 
-STR StorageApi::ToString(const StorageApi::sSmartInfo& sm, U32 indent) {
-    std::stringstream sstr; STR prefix (indent, ' ');
+STR StorageApi::ToString(const StorageApi::sSmartInfo& sm, bool hdr, U32 indent) {
+    std::stringstream sstr, hstr; STR prefix (indent, ' ');
+
+    eAttrType type = AT_INVALID;
+
     for (tAttrConstIter iter = sm.amap.begin(); iter != sm.amap.end(); iter++) {
-        sstr << prefix << ToString(iter->second, 0) << ENDL;
+        const sSmartAttr& attr = iter->second;
+        if (type == AT_INVALID) type = attr.type;
+        sstr << prefix << ToString(attr, 0) << ENDL;
     }
-    return sstr.str();
+
+    if (hdr) {
+        STR atahdr  = "ID                 Attribute Name"
+                      " Val Wrs Thr    RawLo    RawHi Note";
+        STR nvmehdr = "                Attribute Name"
+                      "            Value   RawValue";
+        hstr << prefix << ((type == AT_NVME) ? nvmehdr : atahdr) << ENDL;
+    }
+
+    return hstr.str() + sstr.str();
 }
 
 STR StorageApi::ToString(const StorageApi::sPartition& pt, U32 indent) {
@@ -261,9 +283,9 @@ STR StorageApi::ToString(const StorageApi::sPartition& pt, U32 indent) {
     sstr << prefix << "Partition: ";
     // MAP_ITEM(20, "Name" , pt.name, "");
     MAP_ITEM( 0, "Idx"  , pt.index, "");
-    MAP_ITEM(14, "LBA"  , pt.addr.first, "");
-    MAP_ITEM(14, "Count", pt.addr.second, "sectors");
-    MAP_ITEM( 8, "Size" , pt.cap, "GB");
+    MAP_ITEM(14, "LBA"  , (pt.addr.first >> 9), "");
+    MAP_ITEM(14, "Count", (pt.addr.second >> 9), "sectors");
+    MAP_ITEM( 8, "Size" , (pt.cap >> 21), "GB");
     #undef MAP_ITEM
     return sstr.str();
 }
@@ -284,9 +306,9 @@ WSTR StorageApi::ToWideString(const StorageApi::sPartition& pt, U32 indent) {
     sstr << prefix << L"Partition: ";
     MAP_ITEM(30, L"Name" , pt.name, "");
     MAP_ITEM( 0, L"Idx"  , pt.index, "");
-    MAP_ITEM(14, L"LBA"  , pt.addr.first, "");
-    MAP_ITEM(14, L"Count", pt.addr.second, "sectors");
-    MAP_ITEM( 8, L"Size" , pt.cap, "GB");
+    MAP_ITEM(14, L"LBA"  , (pt.addr.first >> 9), "");
+    MAP_ITEM(14, L"Count", (pt.addr.second >> 9), "sectors");
+    MAP_ITEM( 8, L"Size" , (pt.cap >> 21), "GB");
     #undef MAP_ITEM
     return sstr.str();
 }
@@ -312,6 +334,16 @@ STR StorageApi::ToString(const StorageApi::sDriveInfo &drv, U32 indent) {
     return sstr.str();
 }
 
+STR StorageApi::ToCsvString(const StorageApi::sSmartAttr& sa) {
+    STR rstr; const char* sep = ";";
+    switch(sa.type) {
+    case AT_ATA: rstr = ApiUtil::ToAtaAttrString(sa, sep); break;
+    case AT_NVME: rstr = ApiUtil::ToNvmeAttrString(sa, sep); break;
+    default: rstr = "Unknown_Attribute_Type"; break;
+    }
+    return rstr;
+}
+
 STR StorageApi::ToShortString(const StorageApi::sDriveInfo &drv, U32 indent) {
     // Show drive info without Partitions and SMART
     std::stringstream sstr; STR prefix (indent, ' '); U32  sub = indent + 2;
@@ -323,6 +355,7 @@ STR StorageApi::ToShortString(const StorageApi::sDriveInfo &drv, U32 indent) {
     MAP_ITEM(0,1, "Temperature"       , drv.temp);
     MAP_ITEM(0,1, "Total Host Read"   , drv.tread);
     MAP_ITEM(0,1, "Total Host Written", drv.twrtn);
+    MAP_ITEM(0,1, "Life Left"         , drv.health);
     MAP_ITEM(0,1, "Bus Type"          , ToBusTypeString(drv.bustype));
     MAP_ITEM(0,1, "MaxTransferSector" , drv.maxtfsec);
     #undef MAP_ITEM
@@ -334,11 +367,11 @@ STR StorageApi::ToString(const U8 *bufptr, U32 bufsize) {
 }
 
 STR StorageApi::ToString(const sAdapterInfo &pi, U32 indent) {
-    std::stringstream sstr; STR prefix (indent, ' '); U32  sub = indent + 2;
+    std::stringstream sstr; STR prefix (indent, ' ');
     #define MAP_ITEM(nlmid, nlend, text, val) do { \
         sstr << prefix << text << ": "; \
             if (nlmid) { sstr << ENDL; } sstr << val; if (nlend) { sstr << ENDL; }} while(0)
-        MAP_ITEM(0,1, "BusType"         , ToBusTypeString(pi.BusType));
+    MAP_ITEM(0,1, "BusType"         , ToBusTypeString(pi.BusType));
     MAP_ITEM(0,1, "MaxTransSector"  , pi.MaxTransferSector);
     #undef MAP_ITEM
     return sstr.str();

@@ -134,9 +134,9 @@ eRetCode StorageApi::ScanPartition(HDL handle, sPartInfo &pinf) {
 
         sPartition part;
         part.index = item.PartitionNumber;
-        part.addr.first = item.StartingOffset.QuadPart ;  // byte unit
+        part.addr.first = item.StartingOffset.QuadPart;   // byte unit
         part.addr.second = item.PartitionLength.QuadPart; // byte unit
-        part.cap = ((part.addr.second * 100) >> 30) / 100.0;
+        part.cap = part.addr.second >> 9;                 // cap in sector
         part.name = (item.PartitionStyle == 1) ? item.Gpt.Name : L"Unknown Name";
         pinf.parr.push_back(part);
     }
