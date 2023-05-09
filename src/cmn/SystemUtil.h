@@ -7,6 +7,7 @@ class SystemUtil
 {
 public:
     static bool IsAdminMode();
+    static std::string GetLastErrorString();
     
 };
 

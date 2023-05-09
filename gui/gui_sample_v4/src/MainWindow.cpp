@@ -1337,7 +1337,7 @@ static void DebugFillThreadFunc(void* param) {
     }
 
     // U64 cap_in_sector = drv.id.cap;
-    U64 cap_in_sector = 10 << 21;
+    U64 cap_in_sector = 10 << 21; // testing on 10GB only
     prog->progress = 0; prog->workload = cap_in_sector; prog->ready = true;
 
     HDL hdl;
@@ -1386,10 +1386,19 @@ static void DebugFillThreadFunc(void* param) {
         wrtsec = MIN2(remsec, bufsec);
         FormatBuffer(bufptr, bufsec, lba, wrtsec, 0); // 0: write_count
         sstr << "Writing lba " << lba << " sc " << wrtsec << endl;
-        if (!WriteFile((HANDLE) hdl, bufptr, wrtsec * 512, &wrtsize, NULL)) {
-            sstr << "Last Error: " << GetLastError();
-            SET_PROG_INFO(sstr.str()); FINALIZE_PROG(RET_FAIL); return;
+        U32 retry = 0, remax = 5;
+
+        while(!WriteFile((HANDLE) hdl, bufptr, wrtsec * 512, &wrtsize, NULL)) {
+            retry++;
+            if (retry > remax) {
+                sstr << "Last Error: " << GetLastError();
+                SET_PROG_INFO(sstr.str()); FINALIZE_PROG(RET_FAIL); return;
+            }
         }
+        // if (!WriteFile((HANDLE) hdl, bufptr, wrtsec * 512, &wrtsize, NULL)) {
+        //     sstr << "Last Error: " << GetLastError();
+        //     SET_PROG_INFO(sstr.str()); FINALIZE_PROG(RET_FAIL); return;
+        // }
 
         remsec -= wrtsec; prog->progress += wrtsec;
     }
