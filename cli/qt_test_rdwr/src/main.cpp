@@ -246,12 +246,23 @@ U32 UtilReadSector(HDL hdl, U64 lba, U32 sec_cnt, U8* buffer, U32 bufsize) {
     return ret_size;
 }
 
-#define LBA0B    0
-#define LBA100KB (((U64)100 << 10) >> 9)
-#define LBA100MB (((U64)100 << 20) >> 9)
-#define LBA100GB (((U64)100 << 30) >> 9)
-#define LBA200GB (((U64)200 << 30) >> 9)
-#define LBA100TB (((U64)100 << 40) >> 9)
+#define CAP0B    0
+#define CAP100KB ((U64)100 << 10)
+#define CAP500KB ((U64)500 << 10)
+#define CAP100MB ((U64)100 << 20)
+#define CAP500MB ((U64)500 << 20)
+#define CAP030GB ((U64) 30 << 30)
+#define CAP100GB ((U64)100 << 30)
+#define CAP200GB ((U64)200 << 30)
+#define CAP100TB ((U64)100 << 40)
+
+#define LBA0B    (CAP0B    >> 9)
+#define LBA100KB (CAP100KB >> 9)
+#define LBA100MB (CAP100MB >> 9)
+#define LBA030GB (CAP030GB >> 9)
+#define LBA100GB (CAP100GB >> 9)
+#define LBA200GB (CAP200GB >> 9)
+#define LBA100TB (CAP100TB >> 9)
 
 void TestReadSector() {
     HDL hdl;
@@ -282,7 +293,7 @@ void TestReadSector() {
 
 eRetCode UtilInitDrive(HDL hdl) {
     CREATE_DISK dsk;
-    dsk.PartitionStyle = PARTITION_STYLE_GPT;
+    dsk.PartitionStyle = PARTITION_STYLE_MBR;
     dsk.Mbr.Signature = 9999;
 
     BOOL ret; DWORD junk;
@@ -306,6 +317,68 @@ void TestInitDrive() {
     cout << "Init drive ok" << endl;
 }
 
+#include <diskguid.h>
+#include <ntdddisk.h>
+
+eRetCode UtilAddPartition(HDL hdl, U32 itemcnt, U64 itemsize) {
+    LARGE_INTEGER psize; psize.QuadPart = itemsize;
+
+    DWORD lisize = sizeof(DRIVE_LAYOUT_INFORMATION_EX);
+    DWORD pisize = sizeof(PARTITION_INFORMATION_EX);
+
+    DWORD len = lisize + itemcnt * pisize;
+    DRIVE_LAYOUT_INFORMATION_EX *pli = (DRIVE_LAYOUT_INFORMATION_EX*) malloc(len);
+    if (pli == NULL) { DUMPERR("Cannot allocate memory"); return RET_OUT_OF_MEMORY; }
+
+    cout << "Layout size: " << lisize << endl;
+    cout << "Partition size: " << pisize << endl;
+
+    memset((void*)pli, 0x00, len);
+
+    pli->PartitionStyle = PARTITION_STYLE_MBR;
+    pli->PartitionCount = itemcnt;
+    pli->Mbr.Signature = 99999;
+
+    U32 hdr_sec = 2048;
+    U32 gap_size = CAP500KB;
+    U64 hdr_size = hdr_sec * 512;
+    U64 start = hdr_size;
+
+    for (U32 i = 0; i < itemcnt; i++) {
+
+        PARTITION_INFORMATION_EX& p = pli->PartitionEntry[i];
+        p.PartitionStyle = PARTITION_STYLE_MBR;
+        p.StartingOffset.QuadPart = start + i * (psize.QuadPart + gap_size);
+        p.PartitionLength.QuadPart = psize.QuadPart;
+        p.PartitionNumber = i;
+        p.RewritePartition = TRUE;
+        p.Mbr.PartitionType = PARTITION_NTFT;
+        p.Mbr.BootIndicator = TRUE;
+        p.Mbr.RecognizedPartition = TRUE;
+        p.Mbr.HiddenSectors = CAP500MB >> 9;
+    }
+
+    BOOL ret; DWORD rsize;
+    ret = DeviceIoControl((HANDLE) hdl, IOCTL_DISK_SET_DRIVE_LAYOUT_EX,
+                          pli, len, NULL, 0, &rsize, NULL);
+    free(pli);
+    if (!ret) { DUMPERR("Cannot add partitions"); return RET_FAIL; }
+
+    return RET_OK;
+}
+
+void TestAddPartition() {
+    HDL hdl;
+    if (RET_OK != UtilOpenFile(drvname, hdl)) return;
+
+    cout << "Creating partitions ... ";
+    if (RET_OK != UtilAddPartition(hdl, 3, CAP030GB)) {
+        cout << "FAIL" << endl; return;
+    }
+
+    cout << "OK" << endl;
+}
+
 int main(int argc, char** argv) {
     (void) argc; (void) argv;
 
@@ -314,6 +387,7 @@ int main(int argc, char** argv) {
     // ClearPartTable();
     // WriteFullDisk();
     // TestReadSector();
-    TestInitDrive();
+    // TestInitDrive();
+    TestAddPartition();
     return 0;
 }
