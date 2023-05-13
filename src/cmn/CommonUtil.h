@@ -55,6 +55,12 @@ public:
     static void GetTimeInfo(int dayCount, int& year, int& month, int& day);
 
     static std::string FormatTime(const char* textFormat, const char* timeFormat, time_t sec);
+
+    static void FormatSector(U8* bufptr, U64 lba, U32 wrtcnt);
+    static U32 FormatBuffer(U8* bufptr, U32 bufsec, U64 lba, U32 wrtsec, U32 wrtcnt);
+
+    static void FormatHeader(U8* bufptr, U64 lba, U32 wrtcnt);
+    static U32 FormatHeader(U8* bufptr, U32 bufsec, U64 lba, U32 wrtsec, U32 wrtcnt);
 };
 
 #endif //__COMMONUTIL_H__

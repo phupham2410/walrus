@@ -140,3 +140,50 @@ string CommonUtil::FormatTime(const char* textFormat, const char* timeFormat, ti
     FORMAT_STRING(timeString, textFormat, timeBuff);
     return timeString;
 }
+
+void CommonUtil::FormatSector(U8* bufptr, U64 lba, U32 wrtcnt) {
+    char tmp[33] = {0}; U8* ptr = bufptr;
+    sprintf(tmp, "LBA %12X CNT %10d ", lba, wrtcnt);
+    memcpy(ptr, tmp, 32); ptr += 32;
+
+    const char* pat =
+        "LINE1:SECTOR_DATA_SECTOR_DATA_SE"
+        "LINE2:CTOR_DATA_SECTOR_DATA_SECT"
+        "LINE3:OR_DATA_SECTOR_DATA_SECTOR"
+        "LINE4:_DATA_SECTOR_DATA_SECTOR_D"
+        "LINE5:ATA_SECTOR_DATA_SECTOR_DAT"
+        "LINE6:A_SECTOR_DATA_SECTOR_DATA_"
+        "LINE7:SECTOR_DATA_SECTOR_DATA_SE"
+        "LINE8:CTOR_DATA_SECTOR_DATA_SECT"
+        "LINE9:OR_DATA_SECTOR_DATA_SECTOR"
+        "LINEA:_DATA_SECTOR_DATA_SECTOR_D"
+        "LINEB:ATA_SECTOR_DATA_SECTOR_DAT"
+        "LINEC:A_SECTOR_DATA_SECTOR_DATA_"
+        "LINED:SECTOR_DATA_SECTOR_DATA_SE"
+        "LINEE:CTOR_DATA_SECTOR_DATA_SECT"
+        "LINEF:OR_DATA_SECTOR_DATA_SECTOR";
+
+    memcpy(ptr, pat, 32 * 15);
+}
+
+U32 CommonUtil::FormatBuffer(U8* bufptr, U32 bufsec, U64 lba, U32 wrtsec, U32 wrtcnt) {
+    U32 minsec = MIN2(bufsec, wrtsec);
+    for(U64 i = lba, maxi = lba + minsec; i < maxi; i++) {
+        FormatSector(bufptr + (i - lba) * 512, i, wrtcnt);
+    }
+    return minsec;
+}
+
+void CommonUtil::FormatHeader(U8* bufptr, U64 lba, U32 wrtcnt) {
+    char tmp[33] = {0}; U8* ptr = bufptr;
+    sprintf(tmp, "LBA %12X CNT %10d ", lba, wrtcnt);
+    memcpy(ptr, tmp, 32); ptr += 32;
+}
+
+U32 CommonUtil::FormatHeader(U8* bufptr, U32 bufsec, U64 lba, U32 wrtsec, U32 wrtcnt) {
+    U32 minsec = MIN2(bufsec, wrtsec);
+    for(U64 i = lba, maxi = lba + minsec; i < maxi; i++) {
+        FormatHeader(bufptr + (i - lba) * 512, i, wrtcnt);
+    }
+    return minsec;
+}
