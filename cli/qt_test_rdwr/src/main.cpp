@@ -149,6 +149,7 @@ void TestFileSeek() { // --> ok
         offset = N10GB; TestSeek(hdl, offset, pos);
         offset = N10TB; TestSeek(hdl, offset, pos);
     }
+    Close(hdl);
 }
 
 BOOL GetDriveGeometry(HDL hdl, DISK_GEOMETRY *pdg)
@@ -176,6 +177,7 @@ void TestReadDriveSize()
     cout << "Drive size: " << drvsize << " bytes" << endl
          << " (" << ToGB(drvsize) << " GBs)" << endl
          << " (" << ToTB(drvsize) << " TBs)" << endl;
+    Close(hdl);
 }
 
 void ClearPartTable() { // --> ok
@@ -255,6 +257,7 @@ U32 UtilReadSector(HDL hdl, U64 lba, U32 sec_cnt, U8* buffer, U32 bufsize) {
 #define CAP500KB ((U64)500 << 10)
 #define CAP100MB ((U64)100 << 20)
 #define CAP500MB ((U64)500 << 20)
+#define CAP020GB ((U64) 20 << 30)
 #define CAP030GB ((U64) 30 << 30)
 #define CAP100GB ((U64)100 << 30)
 #define CAP200GB ((U64)200 << 30)
@@ -293,12 +296,40 @@ void TestReadSector() {
         if (!rsize) cout << "Fail" << endl;
         else cout << endl << HexFrmt::ToHexString(buf, rsize) << endl;
     }
+    Close(hdl);
 }
 
-eRetCode UtilInitDrive(HDL hdl) {
+static void UtilSetGuid(GUID& g, U32 d1, U16 d2, U16 d3, U64 d4) {
+    g.Data1 = d1;
+    g.Data2 = d2;
+    g.Data3 = d3;
+    for (int i = 7; i >= 0; i--) {
+        g.Data4[i] = (d4 >> (8*i)) & 0xFF;
+    }
+}
+
+static void UtilSetGuid(GUID& g, GUID src) {
+    g = src;
+}
+
+#include <combaseapi.h>
+
+static void UtilNewGuid(GUID& g) {
+    // HRESULT ret = CoCreateGuid(&g);
+    // if (ret != S_OK) {
+    //     cout << "Fail to create new guid" << endl;
+    // }
+}
+
+eRetCode UtilInitDrive(HDL hdl, PARTITION_STYLE style) {
     CREATE_DISK dsk;
-    dsk.PartitionStyle = PARTITION_STYLE_MBR;
-    dsk.Mbr.Signature = 9999;
+    dsk.PartitionStyle = style;
+    if (style == PARTITION_STYLE_MBR) dsk.Mbr.Signature = 9999;
+    else {
+        GUID gid; UtilNewGuid(gid);
+        dsk.Gpt.MaxPartitionCount = 128;
+        dsk.Gpt.DiskId = gid;
+    }
 
     BOOL ret; DWORD junk;
     ret = DeviceIoControl((HANDLE) hdl, IOCTL_DISK_CREATE_DISK,
@@ -312,17 +343,67 @@ eRetCode UtilInitDrive(HDL hdl) {
     return RET_OK;
 }
 
-void TestInitDrive() {
+void TestInitDriveMRB() {
     HDL hdl;
     if (RET_OK != UtilOpenFile(drvname, hdl)) return;
 
-    if (RET_OK != UtilInitDrive(hdl)) return;
+    if (RET_OK != UtilInitDrive(hdl, PARTITION_STYLE_MBR)) return;
 
     cout << "Init drive ok" << endl;
+    Close(hdl);
+}
+
+void TestInitDriveGPT() {
+    HDL hdl;
+    if (RET_OK != UtilOpenFile(drvname, hdl)) return;
+
+    if (RET_OK != UtilInitDrive(hdl, PARTITION_STYLE_GPT)) return;
+
+    cout << "Init drive ok" << endl;
+    Close(hdl);
 }
 
 #include <diskguid.h>
 #include <ntdddisk.h>
+
+eRetCode UtilGetDriveLayout(HDL hdl, U8* buffer, U32 bufsize) {
+    if (!buffer) return StorageApi::RET_INVALID_ARG;
+    memset(buffer, 0x00, bufsize);
+
+    BOOL ret; DWORD rsize;
+    ret = DeviceIoControl((HANDLE) hdl, IOCTL_DISK_GET_DRIVE_LAYOUT_EX,
+                          NULL, 0, buffer, bufsize, &rsize, NULL);
+
+    if (!ret) { DUMPERR("Cannot read partitions info ex"); return RET_FAIL; }
+    return RET_OK;
+}
+
+void TestGetDriveLayout() {
+    HDL hdl;
+    if (RET_OK != UtilOpenFile(drvname, hdl)) return;
+
+    const U32 bufsize = 4096; U8 buffer[bufsize];
+    memset(buffer, 0x00, bufsize);
+
+    cout << "Get layout information: ";
+    if (RET_OK != UtilGetDriveLayout(hdl, buffer, bufsize)) {
+        cout << "FAIL" << endl; return;
+    }
+    cout << endl;
+
+    DRIVE_LAYOUT_INFORMATION_EX* dli = (DRIVE_LAYOUT_INFORMATION_EX*) buffer;
+    U32 count = dli->PartitionCount;
+    PARTITION_INFORMATION_EX* pi = (PARTITION_INFORMATION_EX*) &dli->PartitionEntry[0];
+
+    cout << ToString(*dli) << endl;
+
+    for (U32 i = 0; i < count; i++, pi++) {
+        if (!pi->PartitionNumber) continue;
+        cout << "Entry " << i << endl << ToString(*pi) << endl;
+    }
+
+    Close(hdl);
+}
 
 eRetCode UtilSetDriveLayoutMRB(HDL hdl, U32 itemcnt, U64 itemsize) {
     LARGE_INTEGER psize; psize.QuadPart = itemsize;
@@ -381,6 +462,7 @@ void TestSetDriveLayoutMRB() {
     }
 
     cout << "OK" << endl;
+    Close(hdl);
 }
 
 eRetCode UtilSetDriveLayoutGPT(HDL hdl, U32 itemcnt, U64 itemsize) {
@@ -403,34 +485,33 @@ eRetCode UtilSetDriveLayoutGPT(HDL hdl, U32 itemcnt, U64 itemsize) {
     pli->Mbr.Signature = 99999;
 
     U32 hdr_sec = 2048;
-    U32 gap_size = CAP500KB;
+    U32 gap_size = CAP100KB;
     U64 hdr_size = hdr_sec * 512;
     U64 start = hdr_size;
 
-    for (U32 i = 0; i < itemcnt; i++) {
+    GUID gid; UtilSetGuid(gid, 0xebd0a0a2, 0xb9e5, 0x4433, 0x87c068b6b72699c7);
 
+    for (U32 i = 0; i < itemcnt; i++) {
+        wstring name = L"Basic data partition";
         PARTITION_INFORMATION_EX& p = pli->PartitionEntry[i];
+
         p.PartitionStyle = PARTITION_STYLE_GPT;
         p.StartingOffset.QuadPart = start + i * (psize.QuadPart + gap_size);
         p.PartitionLength.QuadPart = psize.QuadPart;
-        p.PartitionNumber = i;
+        p.PartitionNumber = i + 1; // index from 1
         p.RewritePartition = TRUE;
 
-        #### WORKING HERE: SETTING FOR GPT PARTITIONS ####
-        #### WORKING HERE: SETTING FOR GPT PARTITIONS ####
-        #### WORKING HERE: SETTING FOR GPT PARTITIONS ####
-
-        p.Gpt.PartitionType = PARTITION_NTFT;
-        p.Gpt.BootIndicator = TRUE;
-        p.Gpt.RecognizedPartition = TRUE;
-        p.Gpt.HiddenSectors = CAP500MB >> 9; // Unknown meaning
+        p.Gpt.PartitionType = gid;
+        p.Gpt.PartitionId = p.Gpt.PartitionType;
+        p.Gpt.Attributes = 0;
+        for (U32 i = 0; i < name.length(); i++) p.Gpt.Name[i] = name[i];
     }
 
     BOOL ret; DWORD rsize;
     ret = DeviceIoControl((HANDLE) hdl, IOCTL_DISK_SET_DRIVE_LAYOUT_EX,
                           pli, len, NULL, 0, &rsize, NULL);
     free(pli);
-    if (!ret) { DUMPERR("Cannot add partitions"); return RET_FAIL; }
+    if (!ret) { DUMPERR("Cannot set drive layout"); return RET_FAIL; }
 
     return RET_OK;
 }
@@ -440,44 +521,12 @@ void TestSetDriveLayoutGPT() {
     if (RET_OK != UtilOpenFile(drvname, hdl)) return;
 
     cout << "Creating partitions ... ";
-    if (RET_OK != UtilSetDriveLayoutGPT(hdl, 3, CAP030GB)) {
+    if (RET_OK != UtilSetDriveLayoutGPT(hdl, 4, CAP020GB)) {
         cout << "FAIL" << endl; return;
     }
 
     cout << "OK" << endl;
-}
-
-eRetCode UtilGetDriveLayout(HDL hdl, U8* buffer, U32 bufsize) {
-    if (!buffer) return StorageApi::RET_INVALID_ARG;
-    memset(buffer, 0x00, bufsize);
-
-    BOOL ret; DWORD rsize;
-    ret = DeviceIoControl((HANDLE) hdl, IOCTL_DISK_GET_DRIVE_LAYOUT_EX,
-                          NULL, 0, buffer, bufsize, &rsize, NULL);
-
-    if (!ret) { DUMPERR("Cannot read partitions info ex"); return RET_FAIL; }
-    return RET_OK;
-}
-
-void TestGetDriveLayout() {
-    HDL hdl;
-    if (RET_OK != UtilOpenFile(drvname, hdl)) return;
-
-    const U32 bufsize = 4096; U8 buffer[bufsize];
-    memset(buffer, 0x00, bufsize);
-
-    cout << "Get layout information: ";
-    if (RET_OK != UtilGetDriveLayout(hdl, buffer, bufsize)) {
-        cout << "FAIL" << endl; return;
-    }
-
-    DRIVE_LAYOUT_INFORMATION_EX* dli = (DRIVE_LAYOUT_INFORMATION_EX*) buffer;
-    U32 count = dli->PartitionCount;
-    PARTITION_INFORMATION_EX* pi = (PARTITION_INFORMATION_EX*) &dli->PartitionEntry[0];
-
-    for (U32 i = 0; i < count; i++) {
-        cout << "Entry " << i << endl << ToString(*pi++) << endl;
-    }
+    Close(hdl);
 }
 
 int main(int argc, char** argv) {
@@ -488,9 +537,10 @@ int main(int argc, char** argv) {
     // ClearPartTable();
     // WriteFullDisk();
     // TestReadSector();
-    // TestInitDrive();
-    // UtilSetDriveLayoutMRB();
-    UtilSetDriveLayoutGPT();
+    // TestInitDriveMRB();
+    // TestInitDriveGPT();
     // TestGetDriveLayout();
+    // TestSetDriveLayoutMRB();
+    TestSetDriveLayoutGPT();
     return 0;
 }

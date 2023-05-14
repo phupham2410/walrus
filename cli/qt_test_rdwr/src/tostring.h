@@ -35,9 +35,11 @@ extern std::string ToValueString(U64 val, U32 code);
 extern std::string ToString(GUID& g);
 extern std::string ToPartitionTypeString(GUID& g);
 extern std::string ToGptAttributesString(U64& attr);
+extern std::string ToPartitionStyleString(U32 s);
 extern std::string ToString(PARTITION_INFORMATION_MBR& pi);
 extern std::string ToString(PARTITION_INFORMATION_GPT& pi);
 extern std::string ToString(PARTITION_INFORMATION& pi);
 extern std::string ToString(PARTITION_INFORMATION_EX& pix);
+extern std::string ToString(DRIVE_LAYOUT_INFORMATION_EX& d);
 
 #endif

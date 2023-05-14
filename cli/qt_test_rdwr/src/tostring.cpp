@@ -100,6 +100,17 @@ string ToGptAttriuteString(U64& attr) {
     return sstr.str();
 }
 
+string ToPartitionStyleString(U32 s) {
+    stringstream sstr;
+    switch(s) {
+        case PARTITION_STYLE_MBR: sstr << "Style_MRB"; break;
+        case PARTITION_STYLE_GPT: sstr << "Style_GPT"; break;
+        default: sstr << "Style_UNK"; break;
+    }
+
+    return sstr.str();
+}
+
 string ToString(PARTITION_INFORMATION_MBR& pi) {
     stringstream sstr;
 
@@ -156,5 +167,12 @@ string ToString(PARTITION_INFORMATION_EX& pix) {
     case PARTITION_STYLE_GPT: sstr << ToString(pix.Gpt) << endl; break;
     default: break;
     }
+    return sstr.str();
+}
+
+string ToString(DRIVE_LAYOUT_INFORMATION_EX& d) {
+    stringstream sstr;
+    sstr << "Style: " << ToPartitionStyleString(d.PartitionStyle) << endl;
+    sstr << "Count: " << d.PartitionCount << endl;
     return sstr.str();
 }

@@ -1,5 +1,9 @@
 Opening drive \\.\PhysicalDrive0
-Get layout information: Entry 0
+Get layout information:
+Style: Style_GPT
+Count: 6
+
+Entry 0
 Style: GPT
 Index: 1
 Rewrt: False
@@ -29,7 +33,6 @@ Index: 3
 Rewrt: False
 Offset:  122683392 (bytes) 0 (GB) 239616 (sectors)
 Length:  214285458944 (bytes) 199 (GB) 418526287 (sectors)
-
 GPT::Type: ebd0a0a2-b9e5-4433-87c0-68b6b72699c7 (PARTITION_BASIC_DATA_GUID)
 GPT::Id:   ebd0a0a2-b9e5-4433-87c0-68b6b72699c7
 GPT::Attr: 0x0000000000000000 (GPT_ATTRIBUTE_INVALID)
@@ -71,5 +74,77 @@ GPT::Id:   de94bba4-06d1-4d40-a16a-bfd50179d6ac
 GPT::Attr: 0x8000000000000001 (GPT_ATTRIBUTE_INVALID)
 GPT::Name:
 
+
+Press <RETURN> to close this window...
+
+Opening drive \\.\PhysicalDrive1
+Get layout information:
+Style: Style_GPT
+Count: 2
+
+Entry 0
+Style: GPT
+Index: 1
+Rewrt: False
+Offset:  17408 (bytes) 0 (GB) 34 (sectors)
+Length:  16759808 (bytes) 0 (GB) 32734 (sectors)
+GPT::Type: e3c9e316-0b5c-4db8-817d-f92df00215ae (PARTITION_MSFT_RESERVED_GUID)
+GPT::Id:   e3c9e316-0b5c-4db8-817d-f92df00215ae
+GPT::Attr: 0x0000000000000000 (GPT_ATTRIBUTE_INVALID)
+GPT::Name: Microsoft reserved partition
+
+
+Entry 1
+Style: GPT
+Index: 2
+Rewrt: False
+Offset:  16777216 (bytes) 0 (GB) 32768 (sectors)
+Length:  2000381018112 (bytes) 1863 (GB) 3906994176 (sectors)
+GPT::Type: ebd0a0a2-b9e5-4433-87c0-68b6b72699c7 (PARTITION_BASIC_DATA_GUID)
+GPT::Id:   ebd0a0a2-b9e5-4433-87c0-68b6b72699c7
+GPT::Attr: 0x0000000000000000 (GPT_ATTRIBUTE_INVALID)
+GPT::Name: Basic data partition
+
+
+Press <RETURN> to close this window...
+
+
+Opening drive \\.\PhysicalDrive2
+Get layout information:
+Style: Style_MRB
+Count: 4
+
+Entry 0
+Style: MRB
+Index: 1
+Rewrt: False
+Offset:  1048576 (bytes) 0 (GB) 2048 (sectors)
+Length:  32212254720 (bytes) 30 (GB) 62914560 (sectors)
+MRB::Type: 128
+MRB::Boot: True
+MRB::Reco: True
+MRB::Hsec: 2048
+
+Entry 1
+Style: MRB
+Index: 2
+Rewrt: False
+Offset:  32213815296 (bytes) 30 (GB) 62917608 (sectors)
+Length:  32212254720 (bytes) 30 (GB) 62914560 (sectors)
+MRB::Type: 128
+MRB::Boot: True
+MRB::Reco: True
+MRB::Hsec: 62917608
+
+Entry 2
+Style: MRB
+Index: 3
+Rewrt: False
+Offset:  64426582016 (bytes) 60 (GB) 125833168 (sectors)
+Length:  32212254720 (bytes) 30 (GB) 62914560 (sectors)
+MRB::Type: 128
+MRB::Boot: True
+MRB::Reco: True
+MRB::Hsec: 125833168
 
 Press <RETURN> to close this window...
