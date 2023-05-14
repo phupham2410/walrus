@@ -257,6 +257,7 @@ U32 UtilReadSector(HDL hdl, U64 lba, U32 sec_cnt, U8* buffer, U32 bufsize) {
 #define CAP500KB ((U64)500 << 10)
 #define CAP100MB ((U64)100 << 20)
 #define CAP500MB ((U64)500 << 20)
+#define CAP010GB ((U64) 10 << 30)
 #define CAP020GB ((U64) 20 << 30)
 #define CAP030GB ((U64) 30 << 30)
 #define CAP100GB ((U64)100 << 30)
@@ -299,12 +300,13 @@ void TestReadSector() {
     Close(hdl);
 }
 
+// 0x87c068b6b72699c7
 static void UtilSetGuid(GUID& g, U32 d1, U16 d2, U16 d3, U64 d4) {
     g.Data1 = d1;
     g.Data2 = d2;
     g.Data3 = d3;
     for (int i = 7; i >= 0; i--) {
-        g.Data4[i] = (d4 >> (8*i)) & 0xFF;
+        g.Data4[7-i] = (d4 >> (8*i)) & 0xFF;
     }
 }
 
@@ -529,6 +531,115 @@ void TestSetDriveLayoutGPT() {
     Close(hdl);
 }
 
+enum ePartType {
+    DPT_INVALID = 0,
+    DPT_PARTITION_BASIC_DATA_GUID,
+    DPT_PARTITION_ENTRY_UNUSED_GUID,
+    DPT_PARTITION_SYSTEM_GUID,
+    DPT_PARTITION_MSFT_RESERVED_GUID,
+    DPT_PARTITION_LDM_METADATA_GUID,
+    DPT_PARTITION_LDM_DATA_GUID,
+    DPT_PARTITION_MSFT_RECOVERY_GUID,
+};
+
+struct sDiskPartInfo {
+    U32 pidx;   // 1, 2, 3
+    U32 ptype;  // PARTITION_BASIC_DATA_GUID ...
+    U64 start;  // in bytes
+    U64 psize;  // in bytes
+    U64 nsize;
+};
+
+struct sSrcDriveInfo {
+    U32 drvidx;
+    U32 pcnt;
+    sDiskPartInfo pinfo[128];
+};
+
+ePartType ConvertGptPartitionType(GUID& src) {
+    #define MAP_ITEM(d1, d2, d3, d4, val) \
+    { GUID g; UtilSetGuid(g, d1, d2, d3, d4); if (src == g) return val; }
+    MAP_ITEM(0xebd0a0a2, 0xb9e5, 0x4433, 0x87c068b6b72699c7, DPT_PARTITION_BASIC_DATA_GUID)
+    MAP_ITEM(0x00000000, 0x0000, 0x0000, 0x0000000000000000, DPT_PARTITION_ENTRY_UNUSED_GUID)
+    MAP_ITEM(0xc12a7328, 0xf81f, 0x11d2, 0xba4b00a0c93ec93b, DPT_PARTITION_SYSTEM_GUID)
+    MAP_ITEM(0xe3c9e316, 0x0b5c, 0x4db8, 0x817df92df00215ae, DPT_PARTITION_MSFT_RESERVED_GUID)
+    MAP_ITEM(0x5808c8aa, 0x7e8f, 0x42e0, 0x85d2e1e90434cfb3, DPT_PARTITION_LDM_METADATA_GUID)
+    MAP_ITEM(0xaf9b60a0, 0x1431, 0x4f62, 0xbc683311714a69ad, DPT_PARTITION_LDM_DATA_GUID)
+    MAP_ITEM(0xde94bba4, 0x06d1, 0x4d40, 0xa16abfd50179d6ac, DPT_PARTITION_MSFT_RECOVERY_GUID)
+    #undef MAP_ITEM
+    return DPT_INVALID;
+}
+
+void ConvertPartInfo(PARTITION_INFORMATION_EX& p, sDiskPartInfo& dpi) {
+    dpi.pidx = p.PartitionNumber;
+    dpi.start = p.StartingOffset.QuadPart;
+    dpi.psize = p.PartitionLength.QuadPart;
+    dpi.nsize = dpi.psize + CAP010GB; // round up 10 GB
+
+    switch(p.PartitionStyle) {
+    case PARTITION_STYLE_RAW: dpi.ptype = DPT_PARTITION_BASIC_DATA_GUID; break;
+    case PARTITION_STYLE_MBR: dpi.ptype = DPT_PARTITION_BASIC_DATA_GUID; break;
+    case PARTITION_STYLE_GPT: dpi.ptype = ConvertGptPartitionType(p.Gpt.PartitionType); break;
+    default: break;
+    }
+}
+
+bool GetDriveIndex(const string& name, U32& index) {
+    const char* p = name.c_str();
+    while(*p && !INRANGE('0', '9' + 1, *p)) p++;
+    if (!*p) return false;
+    sscanf(p, "%d", index); return true;
+}
+
+string GenDiskPartScript(sSrcDriveInfo& sdi) {
+    stringstream sstr;
+    sstr << "select disk " << sdi.drvidx << endl;
+    for (U32 i = 0; i < sdi.pcnt; i++) {
+        sDiskPartInfo& dpi = sdi.pinfo[i];
+        sstr << "select partition " << dpi.pidx << endl;
+    }
+
+    return sstr.str();
+}
+
+void TestDiskPart_GenScript() {
+    HDL hdl;
+    if (RET_OK != UtilOpenFile(drvname, hdl)) return;
+
+    const U32 bufsize = 4096; U8 buffer[bufsize];
+    memset(buffer, 0x00, bufsize);
+
+    cout << "Get layout information: ";
+    if (RET_OK != UtilGetDriveLayout(hdl, buffer, bufsize)) {
+        cout << "FAIL" << endl; return;
+    }
+    cout << endl;
+
+    DRIVE_LAYOUT_INFORMATION_EX* dli = (DRIVE_LAYOUT_INFORMATION_EX*) buffer;
+    U32 count = dli->PartitionCount;
+    PARTITION_INFORMATION_EX* pi = (PARTITION_INFORMATION_EX*) &dli->PartitionEntry[0];
+
+    cout << ToString(*dli) << endl;
+
+    sSrcDriveInfo sdi;
+    if (!GetDriveIndex(drvname, sdi.drvidx)) {
+        cout << "Unknown drive index" << endl; return;
+    }
+
+    for (U32 i = 0; i < count; i++, pi++) {
+        PARTITION_INFORMATION_EX& p = *pi;
+        if (!p.PartitionNumber) continue;
+        sDiskPartInfo& dpi = sdi.pinfo[sdi.pcnt++];
+        ConvertPartInfo(p, dpi);
+    }
+
+    // Build DiskPart script
+    string scr = GenDiskPartScript(sdi);
+    cout << "DiskPart script: " << endl << scr << endl;
+
+    Close(hdl);
+}
+
 int main(int argc, char** argv) {
     (void) argc; (void) argv;
 
@@ -541,6 +652,7 @@ int main(int argc, char** argv) {
     // TestInitDriveGPT();
     // TestGetDriveLayout();
     // TestSetDriveLayoutMRB();
-    TestSetDriveLayoutGPT();
+    // TestSetDriveLayoutGPT();
+    TestDiskPart_GenScript();
     return 0;
 }
