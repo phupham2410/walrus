@@ -499,8 +499,8 @@ public:
     static BOOL ScsiSanitizeCmd(tScsiContext *scsiCtx, eScsiSanitizeType sanitizeType, bool immediate, bool znr, bool ause, uint16_t parameterListLength, uint8_t *ptrData);
 
     // Firmware update
-    static BOOL win10FW_GetfwdlInfoQuery(HANDLE hHandle, PSTORAGE_HW_FIRMWARE_INFO fwdlInfo);
-    static BOOL win10FW_Download(HANDLE hHandle, PSTORAGE_HW_FIRMWARE_INFO fwdlInfo, BYTE slotId, PDWORDLONG pOffset, BOOL firstSegment, BOOL lastSegment, uint8_t *ptrData, DWORD dataSize);
+    static BOOL win10FW_GetfwdlInfoQuery(HANDLE hHandle, PSTORAGE_HW_FIRMWARE_INFO fwdlInfo, BOOL isNvme);
+    static BOOL win10FW_TransferFile(HANDLE hHandle, PSTORAGE_HW_FIRMWARE_INFO fwdlInfo, BYTE slotId, LPCWSTR fwFileName, int64_t transize);
     static BOOL win10FW_Active(HANDLE hHandle, PSTORAGE_HW_FIRMWARE_INFO fwdlInfo, BYTE slotId);
 };
 

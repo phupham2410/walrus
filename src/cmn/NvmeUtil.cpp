@@ -903,7 +903,7 @@ BOOL NvmeUtil::ScsiSanitizeCmd(tScsiContext *scsiCtx, eScsiSanitizeType sanitize
 
 
 
-BOOL NvmeUtil::win10FW_GetfwdlInfoQuery(HANDLE hHandle,PSTORAGE_HW_FIRMWARE_INFO fwdlInfo)
+BOOL NvmeUtil::win10FW_GetfwdlInfoQuery(HANDLE hHandle,PSTORAGE_HW_FIRMWARE_INFO fwdlInfo,  BOOL isNvme)
 {
     BOOL ret = FALSE;
 
@@ -921,8 +921,9 @@ BOOL NvmeUtil::win10FW_GetfwdlInfoQuery(HANDLE hHandle,PSTORAGE_HW_FIRMWARE_INFO
     memset(outputData, 0, outputDataSize);
     DWORD returned_data = 0;
 
-    // FOR NVME
-    fwdlInfoQuery.Flags |= STORAGE_HW_FIRMWARE_REQUEST_FLAG_CONTROLLER;
+    if (isNvme) {
+        fwdlInfoQuery.Flags |= STORAGE_HW_FIRMWARE_REQUEST_FLAG_CONTROLLER;
+    }
 
     int fwdlRet = DeviceIoControl(hHandle,
                                   IOCTL_STORAGE_FIRMWARE_GET_INFO,
@@ -965,72 +966,189 @@ BOOL NvmeUtil::win10FW_GetfwdlInfoQuery(HANDLE hHandle,PSTORAGE_HW_FIRMWARE_INFO
 }
 
 
+static BOOL readFile(HANDLE fileHandle,PUCHAR buffer, ULONG bufferLength, PULONG readLength) {
+    BOOL   result = TRUE;
+    ULONG currentReadOffset = 0;
+    ULONG tmpReadLength = 0;
 
-BOOL NvmeUtil::win10FW_Download(HANDLE hHandle, PSTORAGE_HW_FIRMWARE_INFO fwdlInfo, BYTE slotId, PDWORDLONG pOffset, BOOL firstSegment, BOOL lastSegment, uint8_t *ptrData, DWORD dataSize){
-    BOOL ret = FALSE;
+    RtlZeroMemory(buffer, bufferLength);
+    *readLength = 0;
+    while(currentReadOffset < bufferLength) {
+        result = ReadFile(fileHandle, &buffer[currentReadOffset], bufferLength - currentReadOffset, &tmpReadLength, NULL);
+        if (result == FALSE) {
+            return FALSE;
+        }
 
-    //send download IOCTL
-    DWORD downloadStructureSize = sizeof(STORAGE_HW_FIRMWARE_DOWNLOAD) + fwdlInfo->ImagePayloadMaxSize;
-    PSTORAGE_HW_FIRMWARE_DOWNLOAD downloadIO = C_CAST(PSTORAGE_HW_FIRMWARE_DOWNLOAD, malloc(downloadStructureSize));
-    if (!downloadIO)
-    {
+        if (tmpReadLength == 0) {
+            break;
+        }
+
+        currentReadOffset += tmpReadLength;
+    }
+
+    *readLength = currentReadOffset;
+    return TRUE;
+}
+
+BOOL NvmeUtil::win10FW_TransferFile(HANDLE hHandle, PSTORAGE_HW_FIRMWARE_INFO fwdlInfo, BYTE slotId, LPCWSTR fwFileName, int64_t transize) {
+    BOOL                    result = TRUE;
+
+    PUCHAR                  buffer = NULL;
+    ULONG                   bufferSize;
+    ULONG                   imageBufferLength;
+
+    PSTORAGE_HW_FIRMWARE_DOWNLOAD   firmwareDownload = NULL;
+    ULONG                   returnedLength;
+
+
+    HANDLE                  fileHandle = NULL;
+    ULONG                   imageOffset;
+    ULONG                   readLength;
+    BOOLEAN                 moreToDownload;
+    DWORD fileSize;
+    BOOL firstFrame = TRUE;
+    BOOL lastFrame = FALSE;
+
+
+    /* The Max Transfer Length limits the part of buffer that may need to transfer to controller, not the whole buffer.*/
+    bufferSize = FIELD_OFFSET(STORAGE_HW_FIRMWARE_DOWNLOAD, ImageBuffer);
+    bufferSize += fwdlInfo->ImagePayloadMaxSize;
+
+    buffer = (PUCHAR)malloc(bufferSize);
+    if (buffer == NULL) {
+        printf("Allocate buffer for sending firmware image file failed. Error code: %d\n", GetLastError());
         return FALSE;
     }
-    memset(downloadIO, 0, downloadStructureSize);
-    downloadIO->Version = sizeof(STORAGE_HW_FIRMWARE_DOWNLOAD);
-    downloadIO->Size = downloadStructureSize;
-    if (lastSegment) {
-        //This IS documented on MSDN but VS2015 can't seem to find it...
-        //One website says that this flag is new in Win10 1704 - creators update (10.0.15021)
-        downloadIO->Flags |= STORAGE_HW_FIRMWARE_REQUEST_FLAG_LAST_SEGMENT;
-    }
-    if (firstSegment) {
-        downloadIO->Flags |= STORAGE_HW_FIRMWARE_REQUEST_FLAG_FIRST_SEGMENT;
-    }
+
+    /* Setup header of firmware download data structure.*/
+    RtlZeroMemory(buffer, bufferSize);
+
+    firmwareDownload = (PSTORAGE_HW_FIRMWARE_DOWNLOAD)buffer;
+    firmwareDownload->Version = sizeof(STORAGE_HW_FIRMWARE_DOWNLOAD);
+    firmwareDownload->Size = bufferSize;
 
     if (fwdlInfo->FirmwareShared) {
-        //if we are on NVMe, but the command comes to here, then someone forced SCSI mode, so let's set this flag correctly
-        downloadIO->Flags |= STORAGE_HW_FIRMWARE_REQUEST_FLAG_CONTROLLER;
+        firmwareDownload->Flags = STORAGE_HW_FIRMWARE_REQUEST_FLAG_CONTROLLER;
+    } else {
+        firmwareDownload->Flags = 0;
     }
 
-    //we need to set the offset since MS uses this in the command sent to the device.
-    downloadIO->Offset = *pOffset;//TODO: Make sure this works even though the buffer pointer is only the current segment!
-    downloadIO->Slot = slotId;
+    firmwareDownload->Slot = slotId;
 
-    //set the size of the buffer
-    if (dataSize > fwdlInfo->ImagePayloadMaxSize) {
-        dataSize =  fwdlInfo->ImagePayloadMaxSize;
+    /* Open image file and download it to controller.*/
+    //imageBufferLength = bufferSize - FIELD_OFFSET(STORAGE_HW_FIRMWARE_DOWNLOAD, ImageBuffer);
+    imageBufferLength = M_Min(bufferSize - FIELD_OFFSET(STORAGE_HW_FIRMWARE_DOWNLOAD, ImageBuffer),static_cast<ULONG>(transize*1024));
+
+
+    imageOffset = 0;
+    readLength = 0;
+    moreToDownload = TRUE;
+
+
+    fileHandle = CreateFile(fwFileName,   // file to open
+                            GENERIC_READ,          // open for reading
+                            FILE_SHARE_READ,       // share for reading
+                            NULL,                  // default security
+                            OPEN_EXISTING,         // existing file only
+                            FILE_ATTRIBUTE_NORMAL, // normal file
+                            NULL);                 // no attr. template
+
+    if (fileHandle == INVALID_HANDLE_VALUE) {
+        printf("Unable to open handle for firmware image file errocode %d\n", GetLastError());
+        if (buffer != NULL)
+            free(buffer);
+        return FALSE;
     }
 
-    if (dataSize > 0)
-    {
-        downloadIO->BufferSize = ((dataSize - 1) / fwdlInfo->ImagePayloadAlignment + 1) * fwdlInfo->ImagePayloadAlignment;
+    fileSize = GetFileSize(fileHandle, NULL);
+    if (fileSize == INVALID_FILE_SIZE) {
+        printf("Unable to read file size: %d\n", GetLastError());
+        if (buffer != NULL)
+            free(buffer);
+        return FALSE;
     }
-    else
-    {
-        downloadIO->BufferSize = 0;
-    }
 
-    //now copy the buffer into this IOCTL struct
-    memcpy(downloadIO->ImageBuffer, ptrData, dataSize);
-    //time to issue the IO
-    DWORD returned_data = 0;
-    SetLastError(ERROR_SUCCESS);//clear any cached errors before we try to send the command
+    while (moreToDownload) {
+        result = readFile(fileHandle, firmwareDownload->ImageBuffer, imageBufferLength, &readLength);
+        if(result == FALSE) {
+            printf("Read firmware file failed. Error code: %d\n", GetLastError());
 
+            if (fileHandle != NULL) {
+                CloseHandle(fileHandle);
+            }
 
-    ret = DeviceIoControl(hHandle,
+            if (buffer != NULL) {
+                free(buffer);
+            }
+
+            return FALSE;
+        }
+
+        if (readLength == 0) {
+            if (imageOffset == 0) {
+                printf("Firmware image file read return length value 0. Error code: %d\n", GetLastError());
+                if (fileHandle != NULL) {
+                    CloseHandle(fileHandle);
+                }
+
+                if (buffer != NULL) {
+                    free(buffer);
+                }
+
+                return FALSE;
+            }
+
+            moreToDownload = FALSE;
+            break;
+        }
+
+        firmwareDownload->Offset = imageOffset;
+        if (firstFrame) {
+            firstFrame = FALSE;
+            firmwareDownload->Flags |= STORAGE_HW_FIRMWARE_REQUEST_FLAG_FIRST_SEGMENT;
+        } else {
+            firmwareDownload->Flags ^= STORAGE_HW_FIRMWARE_REQUEST_FLAG_FIRST_SEGMENT;
+        }
+
+        if (readLength > 0) {
+            firmwareDownload->BufferSize = ((readLength - 1) / fwdlInfo->ImagePayloadAlignment + 1) * fwdlInfo->ImagePayloadAlignment;
+        } else {
+            firmwareDownload->BufferSize = 0;
+        }
+
+        if  (imageOffset + (ULONG)firmwareDownload->BufferSize >= fileSize) {
+            // This is last segment
+            firmwareDownload->Flags |= STORAGE_HW_FIRMWARE_REQUEST_FLAG_LAST_SEGMENT;
+        }
+
+        /* download this piece of firmware to device */
+        result = DeviceIoControl(hHandle,
                                  IOCTL_STORAGE_FIRMWARE_DOWNLOAD,
-                                 downloadIO,
-                                 downloadStructureSize,
-                                 downloadIO,
-                                 0,
-                                 &returned_data,
+                                 buffer,
+                                 bufferSize,
+                                 buffer,
+                                 bufferSize,
+                                 &returnedLength,
                                  NULL
                                  );
-    if (ret) {
-        *pOffset += downloadIO->BufferSize;
+
+        if (result == FALSE) {
+            printf(("\t DeviceStorageFirmwareUpgrade - firmware download IOCTL failed. Error code: %d\n"), GetLastError());
+            if (fileHandle != NULL) {
+                CloseHandle(fileHandle);
+            }
+
+            if (buffer != NULL) {
+                free(buffer);
+            }
+
+            return FALSE;
+        }
+
+        /* Update Image Offset for next loop.*/
+        imageOffset += (ULONG)firmwareDownload->BufferSize;
     }
-    return ret;
+    return result;
 }
 
 BOOL NvmeUtil::win10FW_Active(HANDLE hHandle, PSTORAGE_HW_FIRMWARE_INFO fwdlInfo, BYTE slotId){
@@ -1053,8 +1171,7 @@ BOOL NvmeUtil::win10FW_Active(HANDLE hHandle, PSTORAGE_HW_FIRMWARE_INFO fwdlInfo
     firmwareActivate->Size = sizeof(STORAGE_HW_FIRMWARE_ACTIVATE);
     firmwareActivate->Slot = slotId;
 
-    if (fwdlInfo->FirmwareShared)
-    {
+    if (fwdlInfo->FirmwareShared) {
         firmwareActivate->Flags = STORAGE_HW_FIRMWARE_REQUEST_FLAG_CONTROLLER;
     }
 
@@ -1076,26 +1193,14 @@ BOOL NvmeUtil::win10FW_Active(HANDLE hHandle, PSTORAGE_HW_FIRMWARE_INFO fwdlInfo
 
     ULONG   seconds = (ULONG)((tickCountEnd - tickCountStart) / 1000);
     ULONG   milliseconds = (ULONG)((tickCountEnd - tickCountStart) % 1000);
+    printf( ("\n\tFirmware activation process took %d.%d seconds.\n"), seconds, milliseconds);
 
-    if (seconds < 5)
-    {
-        printf( ("\n\tFirmware activation process took %d.%d seconds.\n"), seconds, milliseconds);
-    }
-    else
-    {
-        printf( ("\n\tFirmware activation process took %d.%d seconds.\n"), seconds, milliseconds);
-    }
 
-    if (ret)
-    {
+    if (ret) {
         printf( ("\tNew firmware has been successfully applied to device.\n"));
-    }
-    else if (GetLastError() == STG_S_POWER_CYCLE_REQUIRED)
-    {
+    } else if (GetLastError() == STG_S_POWER_CYCLE_REQUIRED) {
         printf( ("\tWarning: Upgrade completed. Power cycle is required to activate the new firmware.\n"));
-    }
-    else
-    {
+    } else {
         if (buffer != NULL) {
             free(buffer);
         }
