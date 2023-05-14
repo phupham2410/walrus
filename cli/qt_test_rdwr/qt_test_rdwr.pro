@@ -4,7 +4,14 @@ CONFIG -= app_bundle
 CONFIG -= qt
 
 SOURCES += \
-        ./src/main.cpp
+        ./src/main.cpp \
+        ./src/tostring.cpp
+
+HEADERS += \
+        ./src/tostring.h
+
+DISTFILES += \
+        ./src/note.txt
 
 # StorageApi code
 include(../../api.pri)

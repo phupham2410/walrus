@@ -1,0 +1,75 @@
+Opening drive \\.\PhysicalDrive0
+Get layout information: Entry 0
+Style: GPT
+Index: 1
+Rewrt: False
+Offset:  1048576 (bytes) 0 (GB) 2048 (sectors)
+Length:  104857600 (bytes) 0 (GB) 204800 (sectors)
+GPT::Type: c12a7328-f81f-11d2-ba4b-00a0c93ec93b (PARTITION_SYSTEM_GUID)
+GPT::Id:   c12a7328-f81f-11d2-ba4b-00a0c93ec93b
+GPT::Attr: 0x8000000000000000 (GPT_BASIC_DATA_ATTRIBUTE_NO_DRIVE_LETTER)
+GPT::Name: EFI system partition
+
+
+Entry 1
+Style: GPT
+Index: 2
+Rewrt: False
+Offset:  105906176 (bytes) 0 (GB) 206848 (sectors)
+Length:  16777216 (bytes) 0 (GB) 32768 (sectors)
+GPT::Type: e3c9e316-0b5c-4db8-817d-f92df00215ae (PARTITION_MSFT_RESERVED_GUID)
+GPT::Id:   e3c9e316-0b5c-4db8-817d-f92df00215ae
+GPT::Attr: 0x8000000000000000 (GPT_BASIC_DATA_ATTRIBUTE_NO_DRIVE_LETTER)
+GPT::Name: Microsoft reserved partition
+
+
+Entry 2
+Style: GPT
+Index: 3
+Rewrt: False
+Offset:  122683392 (bytes) 0 (GB) 239616 (sectors)
+Length:  214285458944 (bytes) 199 (GB) 418526287 (sectors)
+
+GPT::Type: ebd0a0a2-b9e5-4433-87c0-68b6b72699c7 (PARTITION_BASIC_DATA_GUID)
+GPT::Id:   ebd0a0a2-b9e5-4433-87c0-68b6b72699c7
+GPT::Attr: 0x0000000000000000 (GPT_ATTRIBUTE_INVALID)
+GPT::Name: Basic data partition
+
+
+Entry 3
+Style: GPT
+Index: 4
+Rewrt: False
+Offset:  214408626176 (bytes) 199 (GB) 418766848 (sectors)
+Length:  672137216 (bytes) 0 (GB) 1312768 (sectors)
+GPT::Type: de94bba4-06d1-4d40-a16a-bfd50179d6ac (PARTITION_MSFT_RECOVERY_GUID)
+GPT::Id:   de94bba4-06d1-4d40-a16a-bfd50179d6ac
+GPT::Attr: 0x8000000000000001 (GPT_ATTRIBUTE_INVALID)
+GPT::Name:
+
+
+Entry 4
+Style: GPT
+Index: 5
+Rewrt: False
+Offset:  215081811968 (bytes) 200 (GB) 420081664 (sectors)
+Length:  284468183040 (bytes) 264 (GB) 555601920 (sectors)
+GPT::Type: ebd0a0a2-b9e5-4433-87c0-68b6b72699c7 (PARTITION_BASIC_DATA_GUID)
+GPT::Id:   ebd0a0a2-b9e5-4433-87c0-68b6b72699c7
+GPT::Attr: 0x0000000000000000 (GPT_ATTRIBUTE_INVALID)
+GPT::Name: Basic data partition
+
+
+Entry 5
+Style: GPT
+Index: 6
+Rewrt: False
+Offset:  499551043584 (bytes) 465 (GB) 975685632 (sectors)
+Length:  555745280 (bytes) 0 (GB) 1085440 (sectors)
+GPT::Type: de94bba4-06d1-4d40-a16a-bfd50179d6ac (PARTITION_MSFT_RECOVERY_GUID)
+GPT::Id:   de94bba4-06d1-4d40-a16a-bfd50179d6ac
+GPT::Attr: 0x8000000000000001 (GPT_ATTRIBUTE_INVALID)
+GPT::Name:
+
+
+Press <RETURN> to close this window...
