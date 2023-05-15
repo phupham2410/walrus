@@ -788,13 +788,15 @@ void TestDiskClone() {
         load += wrk_sec;
         if (load > thr) {
             load = 0; progress++;
-            cout << "Progress: " << progress << endl;
+            cout << "\rProgress: " << progress;
         }
 
         src_lba += wrk_sec;
         dst_lba += wrk_sec;
         rem_sec -= wrk_sec;
     }
+
+    cout << endl << "Done!!!";
 
     Close(sh); Close(dh);
 }
