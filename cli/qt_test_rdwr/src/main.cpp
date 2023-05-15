@@ -257,6 +257,7 @@ U32 UtilReadSector(HDL hdl, U64 lba, U32 sec_cnt, U8* buffer, U32 bufsize) {
 #define CAP500KB ((U64)500 << 10)
 #define CAP100MB ((U64)100 << 20)
 #define CAP500MB ((U64)500 << 20)
+#define CAP005GB ((U64)  5 << 30)
 #define CAP010GB ((U64) 10 << 30)
 #define CAP020GB ((U64) 20 << 30)
 #define CAP030GB ((U64) 30 << 30)
@@ -574,7 +575,7 @@ void ConvertPartInfo(PARTITION_INFORMATION_EX& p, sDiskPartInfo& dpi) {
     dpi.pidx = p.PartitionNumber;
     dpi.start = p.StartingOffset.QuadPart;
     dpi.psize = p.PartitionLength.QuadPart;
-    dpi.nsize = dpi.psize + CAP010GB; // round up 10 GB
+    dpi.nsize = dpi.psize + CAP005GB; // round up 10 GB
 
     switch(p.PartitionStyle) {
     case PARTITION_STYLE_RAW: dpi.ptype = DPT_PARTITION_BASIC_DATA_GUID; break;
@@ -588,17 +589,73 @@ bool GetDriveIndex(const string& name, U32& index) {
     const char* p = name.c_str();
     while(*p && !INRANGE('0', '9' + 1, *p)) p++;
     if (!*p) return false;
-    sscanf(p, "%d", index); return true;
+    sscanf(p, "%d", &index); return true;
 }
 
-string GenDiskPartScript(sSrcDriveInfo& sdi) {
+string GenScript_CleanDrive(sSrcDriveInfo& sdi) {
     stringstream sstr;
     sstr << "select disk " << sdi.drvidx << endl;
     for (U32 i = 0; i < sdi.pcnt; i++) {
         sDiskPartInfo& dpi = sdi.pinfo[i];
         sstr << "select partition " << dpi.pidx << endl;
+        sstr << "delete partition" << endl;
     }
+    return sstr.str();
+}
 
+static bool ToGptTypeString(U32 t, string& tstr) {
+    tstr = "";
+    #define MAP_ITEM(key, value)  case key: tstr = value; break;
+    switch(t) {
+        MAP_ITEM(DPT_PARTITION_BASIC_DATA_GUID, "primary")
+        MAP_ITEM(DPT_PARTITION_SYSTEM_GUID, "efi")
+        MAP_ITEM(DPT_PARTITION_MSFT_RESERVED_GUID, "msr")
+        default: return false;
+    }
+    #undef MAP_ITEM
+    return true;
+}
+
+static bool ToGptIdString(U32 t, string& id) {
+    id = "";
+    #define MAP_ITEM(key, value)  case key: id = value; break;
+    switch(t) {
+        MAP_ITEM(DPT_PARTITION_MSFT_RECOVERY_GUID, "de94bba4-06d1-4d40-a16a-bfd50179d6ac")
+        MAP_ITEM(DPT_PARTITION_ENTRY_UNUSED_GUID, "00000000-0000-0000-0000-000000000000")
+        MAP_ITEM(DPT_PARTITION_LDM_METADATA_GUID, "5808c8aa-7e8f-42e0-85d2-e1e90434cfb3")
+        MAP_ITEM(DPT_PARTITION_LDM_DATA_GUID, "af9b60a0-1431-4f62-bc68-3311714a69ad")
+        default: return false;
+    }
+    #undef MAP_ITEM
+    return true;
+}
+
+string GenScript_GenPart(sSrcDriveInfo& s, U32 tidx) {
+    stringstream sstr;
+    sstr << "select disk " << tidx << endl;
+
+    U64 offset_in_kb = 4, gap = CAP100KB;
+
+    for (U32 i = 0; i < s.pcnt; i++) {
+        sDiskPartInfo& d = s.pinfo[i];
+        // create partition in target drive
+
+        U64 size_in_mb = ((d.nsize + 1024 * 1024 - 1) >> 20); // in MB
+        string typestr, idstr;
+        if (ToGptTypeString(d.ptype, typestr)) {
+            sstr << "create partition " << typestr
+                 << " size=" << size_in_mb
+                 << " offset=" << offset_in_kb << endl;
+        }
+        else if(ToGptIdString(d.ptype, idstr)) {
+            sstr << "create partition primary"
+                 << " id=" << idstr
+                 << " size=" << size_in_mb
+                 << " offset=" << offset_in_kb << endl;
+        }
+
+        offset_in_kb += ((size_in_mb << 20) + gap) >> 10; // unit: KB
+    }
     return sstr.str();
 }
 
@@ -634,10 +691,112 @@ void TestDiskPart_GenScript() {
     }
 
     // Build DiskPart script
-    string scr = GenDiskPartScript(sdi);
+    string scr = GenScript_CleanDrive(sdi);
     cout << "DiskPart script: " << endl << scr << endl;
 
+    if (1) {
+        string frmt = GenScript_GenPart(sdi, 2);
+        cout << "Format script: " << endl << frmt << endl;
+    }
+
     Close(hdl);
+}
+
+const string src_drvname = PHYDRV1;
+const string dst_drvname = PHYDRV2;
+
+void TestDiskClone() {
+    // clone Disk1::Part2 to Disk2::Part3 (PartNumber)
+
+    // Open Disk1_PartTable
+    // Read offset/size of Part2
+
+    // Open Disk2 PartTable
+    // Read offset/size of Part3
+    // Do read/write
+
+    U32 src_idx = 2, dst_idx = 3;
+
+    // ------------------------------------------------------------
+    // Get src/dst partition info
+
+    StorageApi::sPartInfo spi, dpi;
+    if (RET_OK != StorageApi::ScanPartition(src_drvname, spi)) return;
+    if (RET_OK != StorageApi::ScanPartition(dst_drvname, dpi)) return;
+
+    int si = -1, di = -1;
+    for (int i = 0; i < spi.parr.size(); i++)
+        if (spi.parr[i].index == src_idx) { si = i; break; }
+    if (si < 0) { cout << "src part not found" << endl; return; }
+
+    for (int i = 0; i < dpi.parr.size(); i++)
+        if (dpi.parr[i].index == dst_idx) { di = i; break; }
+    if (di < 0) { cout << "dst part not found" << endl; return; }
+
+    sPartition& sp = spi.parr[si]; sPartition& dp = dpi.parr[di];
+
+    // ------------------------------------------------------------
+    // Validation
+
+    U64 srcsize = sp.addr.second, dstsize = dp.addr.second;
+    if (dstsize < srcsize) {
+        cout << "dst not enough space" << endl; return;
+    }
+
+    // ------------------------------------------------------------
+    // Open Src/Dst drives
+
+    HDL sh, dh;
+    if (RET_OK != UtilOpenFile(src_drvname, sh)) return;
+    if (RET_OK != UtilOpenFile(dst_drvname, dh)) return;
+
+    U32 buf_sec = 256, buf_size = buf_sec * 512;
+    U8* buf = (U8*) malloc(buf_size); memset(buf, 0x5A, buf_size);
+    if (!buf) { DUMPERR("Cannot alloc memory"); return; }
+
+    U32 wrk_sec = buf_sec;
+    U64 src_sec = srcsize >> 9, rem_sec = src_sec;
+    U64 src_lba = sp.addr.first >> 9;
+    U64 dst_lba = dp.addr.first >> 9;
+
+    // Seeking
+    if (RET_OK != UtilSeekFile(sh, sp.addr.first, 0)) {
+        DUMPERR("Cannot seek src drive"); return;
+    }
+    if (RET_OK != UtilSeekFile(dh, dp.addr.first, 0)) {
+        DUMPERR("Cannot seek dst drive"); return;
+    }
+
+    U64 progress = 0, load = 0, thr = rem_sec / 100;
+
+    for (U64 i = 0; rem_sec; i++) {
+        wrk_sec = MIN2(wrk_sec, rem_sec);
+
+        // copy from src_lba to dst_lba
+        DWORD tmp_size = 0, read_size = wrk_sec * 512;
+
+        if (TRUE != ReadFile((HANDLE) sh, buf, read_size, &tmp_size, NULL)) {
+            DUMPERR("");
+            cout << "Cannot read lba " << src_lba << endl; break;
+        }
+
+        if (TRUE != WriteFile((HANDLE) dh, buf, tmp_size, NULL, NULL)) {
+            DUMPERR("");
+            cout << "Cannot write lba " << dst_lba << endl; break;
+        }
+
+        load += wrk_sec;
+        if (load > thr) {
+            load = 0; progress++;
+            cout << "Progress: " << progress << endl;
+        }
+
+        src_lba += wrk_sec;
+        dst_lba += wrk_sec;
+        rem_sec -= wrk_sec;
+    }
+
+    Close(sh); Close(dh);
 }
 
 int main(int argc, char** argv) {
@@ -653,6 +812,9 @@ int main(int argc, char** argv) {
     // TestGetDriveLayout();
     // TestSetDriveLayoutMRB();
     // TestSetDriveLayoutGPT();
-    TestDiskPart_GenScript();
+    // TestDiskPart_GenScript();
+
+    TestDiskClone();
+
     return 0;
 }

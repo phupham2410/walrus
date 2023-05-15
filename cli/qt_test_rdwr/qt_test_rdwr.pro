@@ -5,7 +5,8 @@ CONFIG -= qt
 
 SOURCES += \
         ./src/main.cpp \
-        ./src/tostring.cpp
+        ./src/tostring.cpp\
+        ./src/clone.cpp
 
 HEADERS += \
         ./src/tostring.h
