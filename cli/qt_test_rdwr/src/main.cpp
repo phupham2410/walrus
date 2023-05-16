@@ -702,8 +702,8 @@ void TestDiskPart_GenScript() {
     Close(hdl);
 }
 
-const string src_drvname = PHYDRV1;
-const string dst_drvname = PHYDRV2;
+const string src_drvname = PHYDRV0;
+const string dst_drvname = PHYDRV1;
 
 void TestDiskClone() {
     // clone Disk1::Part2 to Disk2::Part3 (PartNumber)
@@ -715,7 +715,7 @@ void TestDiskClone() {
     // Read offset/size of Part3
     // Do read/write
 
-    U32 src_idx = 2, dst_idx = 3;
+    U32 src_idx = 3, dst_idx = 3;
 
     // ------------------------------------------------------------
     // Get src/dst partition info
@@ -788,7 +788,7 @@ void TestDiskClone() {
         load += wrk_sec;
         if (load > thr) {
             load = 0; progress++;
-            cout << "\rProgress: " << progress;
+            cout << "\rProgress: " << progress << "%";
         }
 
         src_lba += wrk_sec;
