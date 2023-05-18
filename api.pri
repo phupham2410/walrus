@@ -6,6 +6,7 @@ INCLUDEPATH += ../../src/cmn
 
 SOURCES += \
     ../../src/cmn/ApiUtil.cpp \
+    ../../src/cmn/CloneUtil.cpp \
     ../../src/cmn/AtaBase.cpp \
     ../../src/cmn/AtaCmd.cpp \
     ../../src/cmn/AtaCmdDirect.cpp \
@@ -42,6 +43,7 @@ HEADERS += \
     ../../src/api/StorageApiScsi.h \
     ../../src/api/StorageApiUsb.h \
     ../../src/cmn/ApiUtil.h \
+    ../../src/cmn/CloneUtil.h \
     ../../src/cmn/AtaBase.h \
     ../../src/cmn/AtaCmd.h \
     ../../src/cmn/CmdBase.h \

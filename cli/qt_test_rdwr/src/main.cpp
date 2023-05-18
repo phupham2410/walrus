@@ -809,7 +809,7 @@ void TestReadEfi() {
 
     // Read & compare EFI partition of 2 drives
 
-    U32 src_idx = 1, dst_idx = 1;
+    U32 src_idx = 3, dst_idx = 3;
 
     // ------------------------------------------------------------
     // Get src/dst partition info

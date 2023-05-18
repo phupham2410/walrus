@@ -171,6 +171,13 @@ eRetCode StorageApi::SelfTest(CSTR &drvname, U32 param, volatile sProgress *p) {
 
 eRetCode StorageApi::CloneDrive(CSTR &dstdrv, CSTR &srcdrv, tConstAddrArray &parr, volatile sProgress *p) {
     (void) dstdrv; (void) srcdrv; (void) parr; (void) p;
+
+    // Open srcdrv, get list of partition info (type, range, index, ..)
+    // compare to parr to check error ..
+    // Generate diskpart script
+    // start diskpart process & run script
+    // start copying data
+
     return ProcessTask(p, 3, RET_NOT_IMPLEMENT);
 }
 
