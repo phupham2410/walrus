@@ -1,1 +1,1 @@
-start "" C:\Qt\Tools\QtCreator\bin\qtcreator.exe C:\Users\Hi\Working\Project\walrus\gui\gui_sample_v4\gui_sample_v4.pro
+start "" C:\Qt\Tools\QtCreator\bin\qtcreator.exe D:\Working\hiptec\walrus\cli\qt_test_rdwr\qt_test_rdwr.pro

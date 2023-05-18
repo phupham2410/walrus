@@ -702,10 +702,10 @@ void TestDiskPart_GenScript() {
     Close(hdl);
 }
 
-const string src_drvname = PHYDRV0;
-const string dst_drvname = PHYDRV1;
-
 void TestDiskClone() {
+    const string src_drvname = PHYDRV0;
+    const string dst_drvname = PHYDRV1;
+
     // clone Disk1::Part2 to Disk2::Part3 (PartNumber)
 
     // Open Disk1_PartTable
@@ -715,7 +715,7 @@ void TestDiskClone() {
     // Read offset/size of Part3
     // Do read/write
 
-    U32 src_idx = 3, dst_idx = 3;
+    U32 src_idx = 2, dst_idx = 2;
 
     // ------------------------------------------------------------
     // Get src/dst partition info
@@ -751,8 +751,9 @@ void TestDiskClone() {
     if (RET_OK != UtilOpenFile(dst_drvname, dh)) return;
 
     U32 buf_sec = 256, buf_size = buf_sec * 512;
-    U8* buf = (U8*) malloc(buf_size); memset(buf, 0x5A, buf_size);
+    U8* buf = (U8*) malloc(buf_size);
     if (!buf) { DUMPERR("Cannot alloc memory"); return; }
+    memset(buf, 0x5A, buf_size);
 
     U32 wrk_sec = buf_sec;
     U64 src_sec = srcsize >> 9, rem_sec = src_sec;
@@ -801,6 +802,121 @@ void TestDiskClone() {
     Close(sh); Close(dh);
 }
 
+void TestReadEfi() {
+
+    const string src_drvname = PHYDRV0;
+    const string dst_drvname = PHYDRV1;
+
+    // Read & compare EFI partition of 2 drives
+
+    U32 src_idx = 1, dst_idx = 1;
+
+    // ------------------------------------------------------------
+    // Get src/dst partition info
+
+    StorageApi::sPartInfo spi, dpi;
+    if (RET_OK != StorageApi::ScanPartition(src_drvname, spi)) return;
+    if (RET_OK != StorageApi::ScanPartition(dst_drvname, dpi)) return;
+
+    int si = -1, di = -1;
+    for (int i = 0; i < spi.parr.size(); i++)
+        if (spi.parr[i].index == src_idx) { si = i; break; }
+    if (si < 0) { cout << "src part not found" << endl; return; }
+
+    for (int i = 0; i < dpi.parr.size(); i++)
+        if (dpi.parr[i].index == dst_idx) { di = i; break; }
+    if (di < 0) { cout << "dst part not found" << endl; return; }
+
+    sPartition& sp = spi.parr[si]; sPartition& dp = dpi.parr[di];
+
+    // ------------------------------------------------------------
+    // Validation
+
+    U64 srcsize = sp.addr.second, dstsize = dp.addr.second;
+    U64 minsize = MIN2(srcsize, dstsize);
+
+    // ------------------------------------------------------------
+    // Open Src/Dst drives
+
+    HDL sh, dh;
+    if (RET_OK != UtilOpenFile(src_drvname, sh)) return;
+    if (RET_OK != UtilOpenFile(dst_drvname, dh)) return;
+
+    U32 buf_sec = 1, buf_size = buf_sec * 512;
+    U8* sbuf = (U8*) malloc(buf_size);
+    if (!sbuf) { DUMPERR("Cannot alloc memory"); return; }
+    memset(sbuf, 0x5A, buf_size);
+
+    U8* dbuf = (U8*) malloc(buf_size);
+    if (!dbuf) { DUMPERR("Cannot alloc memory"); return; }
+    memset(dbuf, 0x5A, buf_size);
+
+    U32 wrk_sec = buf_sec;
+    U64 min_sec = minsize >> 9, rem_sec = min_sec;
+    U64 src_lba = sp.addr.first >> 9;
+    U64 dst_lba = dp.addr.first >> 9;
+
+    // Seeking
+    if (RET_OK != UtilSeekFile(sh, sp.addr.first, 0)) {
+        DUMPERR("Cannot seek src drive"); return;
+    }
+    if (RET_OK != UtilSeekFile(dh, dp.addr.first, 0)) {
+        DUMPERR("Cannot seek dst drive"); return;
+    }
+
+    U64 progress = 0, load = 0, thr = rem_sec / 100;
+
+    for (U64 i = 0; rem_sec; i++) {
+        wrk_sec = MIN2(wrk_sec, rem_sec);
+
+        // copy from src_lba to dst_lba
+        DWORD tmp_src_size = 0, tmp_dst_size = 0, read_size = wrk_sec * 512;
+
+        if (TRUE != ReadFile((HANDLE) sh, sbuf, read_size, &tmp_src_size, NULL)) {
+            DUMPERR("");
+            cout << "Cannot read src lba " << src_lba << endl; break;
+        }
+
+        if (TRUE != ReadFile((HANDLE) dh, dbuf, read_size, &tmp_dst_size, NULL)) {
+            DUMPERR("");
+            cout << "Cannot read dst lba " << dst_lba << endl; break;
+        }
+
+        if (tmp_src_size != tmp_dst_size) {
+            cout << "Datasize mismatched: "
+                << "src_size(" << tmp_src_size << ")"
+                << "dst_size(" << tmp_dst_size << ")"
+                << endl; break;
+        }
+
+        U32 tmp_size = tmp_src_size;
+
+        if (memcmp(sbuf, dbuf, tmp_size)) {
+            cout << "Data mismatched: " << endl;
+            cout << "Src data: " << endl
+                 << HexFrmt::ToHexString(sbuf, tmp_size) << endl;
+            cout << "Dst data: " << endl
+                 << HexFrmt::ToHexString(dbuf, tmp_size) << endl;
+            break;
+        }
+
+        load += wrk_sec;
+        if (load > thr) {
+            load = 0; progress++;
+            cout << "\rComparing: " << progress << "%";
+        }
+
+        src_lba += wrk_sec;
+        dst_lba += wrk_sec;
+        rem_sec -= wrk_sec;
+    }
+
+    if (!rem_sec) cout << endl << "Done!!!";
+    else cout << endl << "Compare fail at block src_lba " << src_lba << endl;
+
+    Close(sh); Close(dh);
+}
+
 int main(int argc, char** argv) {
     (void) argc; (void) argv;
 
@@ -816,7 +932,9 @@ int main(int argc, char** argv) {
     // TestSetDriveLayoutGPT();
     // TestDiskPart_GenScript();
 
-    TestDiskClone();
+    // TestDiskClone();
+
+    TestReadEfi();
 
     return 0;
 }
