@@ -917,6 +917,10 @@ void TestReadEfi() {
     Close(sh); Close(dh);
 }
 
+void TestExecScript() {
+
+}
+
 int main(int argc, char** argv) {
     (void) argc; (void) argv;
 

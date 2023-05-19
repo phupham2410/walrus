@@ -38,10 +38,11 @@ namespace DiskCloneUtil { // DC
     typedef std::vector<sDcPartInfo> tDcPiArray;
     typedef const std::vector<sDcPartInfo> tDcPiConstArray;
 
-    StorageApi::eRetCode GetDriveInfo(StorageApi::HDL hdl, U32 srcidx, sDcDriveInfo& si);
-    StorageApi::eRetCode ValidateRange(StorageApi::tConstAddrArray &parr, sDcDriveInfo& si);
+    StorageApi::eRetCode GetDriveInfo(U32 srcidx, sDcDriveInfo& si);
+    StorageApi::eRetCode FilterPartition(StorageApi::tConstAddrArray &parr, sDcDriveInfo& si);
     StorageApi::eRetCode GenDestRange(const sDcDriveInfo& si, U32 dstidx, sDcDriveInfo& di);
-    StorageApi::eRetCode GenCloneScript(const sDcDriveInfo& si, const sDcDriveInfo& di, std::string& script);
+    StorageApi::eRetCode RemovePartTable(U32 dstidx);
+    StorageApi::eRetCode GenCreatePartScript(const sDcDriveInfo& di, std::string& script);
     StorageApi::eRetCode ExecScript(std::string& script);
     StorageApi::eRetCode ClonePartitions(const sDcDriveInfo& si, const sDcDriveInfo& di);
 
