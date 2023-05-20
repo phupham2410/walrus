@@ -44,12 +44,16 @@ namespace DiskCloneUtil { // DC
     StorageApi::eRetCode RemovePartTable(U32 dstidx);
     StorageApi::eRetCode GenCreatePartScript(const sDcDriveInfo& di, std::string& script);
     StorageApi::eRetCode ExecScript(std::string& script);
-    StorageApi::eRetCode ClonePartitions(const sDcDriveInfo& si, const sDcDriveInfo& di);
+    StorageApi::eRetCode ClonePartitions(
+        const sDcDriveInfo& si, const sDcDriveInfo& di,
+        volatile StorageApi::sProgress* p = NULL);
 
     // Called from StorageApi
     StorageApi::eRetCode HandleCloneDrive(
         StorageApi::CSTR& dstdrv, StorageApi::CSTR& srcdrv,
         StorageApi::tConstAddrArray& parr, volatile StorageApi::sProgress* p = NULL);
+
+    StorageApi::eRetCode TestCloneDrive(U32 dstidx, U32 srcidx, U64 extsize);
 }
 
 #endif

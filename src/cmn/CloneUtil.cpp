@@ -12,6 +12,34 @@ using namespace DiskCloneUtil;
 #include <diskguid.h>
 #include <ntdddisk.h>
 
+#define DBGMODE 1
+
+// ----------------------------------------------------------------------------
+// Temporaryly put here
+
+#define INIT_PROGRESS(prog, load)     do { if (prog) prog->init(load); } while(0)
+#define UPDATE_PROGRESS(prog, weight) do { if (prog) prog->progress += weight; } while(0)
+#define CLOSE_PROGRESS(prog)          do { if (prog) prog->done = true; } while(0)
+#define UPDATE_RETCODE(prog, code)    do { if (prog) prog->rval = code; } while(0)
+#define UPDATE_INFO(prog, infostr)    do { if (prog) prog->info = infostr; } while(0)
+#define FINALIZE_PROGRESS(prog, code) do { \
+UPDATE_RETCODE(prog, code); CLOSE_PROGRESS(prog); } while(0)
+#define RETURN_IF_STOP(prog, code)    do { if (prog && prog->stop) { \
+    FINALIZE_PROGRESS(prog, code); return code; }} while(0)
+#define FINALIZE_IF_STOP(prog, code)    do { if (prog && prog->stop) { \
+    FINALIZE_PROGRESS(prog, code); return code; }} while(0)
+
+#define SKIP_AND_CONTINUE(prog, weight) \
+if (prog) { prog->progress += weight; continue; }
+
+#define UPDATE_AND_RETURN_IF_STOP(p, w, ret) \
+    UPDATE_PROGRESS(p, w); FINALIZE_IF_STOP(p, ret)
+
+#define TRY_TO_EXECUTE_COMMAND(hdl, cmd) \
+    (cmd.executeCommand((int) hdl) && (CMD_ERROR_NONE == cmd.getErrorStatus()))
+
+// ----------------------------------------------------------------------------
+
 static void UtilSetGuid(GUID& g, U32 d1, U16 d2, U16 d3, U64 d4) {
     g.Data1 = d1; g.Data2 = d2; g.Data3 = d3;
     for (int i = 7; i >= 0; i--) {
@@ -73,7 +101,6 @@ static void ConvertPartInfo(PARTITION_INFORMATION_EX& p, sDcPartInfo& dpi) {
 
 static eRetCode UtilOpenFile(U32 drvidx, HDL& hdl) {
     string name = GetDriveName(drvidx);
-    cout << "Opening drive " << name << endl;
     if (RET_OK != StorageApi::Open(name, hdl)) return RET_FAIL;
     return RET_OK;
 }
@@ -175,6 +202,7 @@ eRetCode DiskCloneUtil::FilterPartition(tConstAddrArray &parr, sDcDriveInfo& si)
         size = ((size + CAP1MB - 1) / CAP1MB) * CAP1MB; // round to MB
         info.nsize = size; out.push_back(info);
     }
+
     si.parr = out; return out.size() ? RET_OK : RET_EMPTY;
 }
 
@@ -187,7 +215,7 @@ eRetCode DiskCloneUtil::GenDestRange(const sDcDriveInfo& si, U32 dstidx, sDcDriv
         const sDcPartInfo& s = si.parr[i];
         sDcPartInfo d = s;
         d.pidx = di.parr.size() + 1; // start from 1
-        d.start = start; d.psize = s.nsize;
+        d.start = start; d.psize = d.nsize = s.nsize;
         di.parr.push_back(d);
         start += d.psize + gap;
     }
@@ -221,13 +249,13 @@ static eRetCode GenCreatePartScript(const sDcPartInfo& d, string& script) {
     if (ToGptPartTypeString(d.ptype, typestr)) {
         sstr << "create partition " << typestr
              << " size=" << size_in_mb
-             << " offset=" << offset_in_kb << endl;
+             << " offset=" << offset_in_kb;
     }
     else if(ToGptPartIdString(d.ptype, idstr)) {
         sstr << "create partition primary"
              << " id=" << idstr
              << " size=" << size_in_mb
-             << " offset=" << offset_in_kb << endl;
+             << " offset=" << offset_in_kb;
     }
 
     script = sstr.str();
@@ -244,6 +272,10 @@ eRetCode DiskCloneUtil::GenCreatePartScript(const sDcDriveInfo& di, std::string&
 
     stringstream sstr;
     sstr << "select disk " << di.drvidx << endl;
+    sstr << "clean" << endl;
+    sstr << "convert gpt" << endl;
+    sstr << "select partition 1" << endl;
+    sstr << "delete partition override" << endl;
 
     for (U32 i = 0; i < di.parr.size(); i++) {
         const sDcPartInfo& pi = di.parr[i]; string subscr;
@@ -253,10 +285,15 @@ eRetCode DiskCloneUtil::GenCreatePartScript(const sDcDriveInfo& di, std::string&
 
     sstr << "exit" << endl;
     script = sstr.str();
+
+    if (DBGMODE) {
+        cout << "Create partition script: " << endl << script << endl;
+    }
+
     return RET_OK;
 }
 
-static string GenRandomTimeString() {
+static string GenScriptFileName() {
     return string(tmpnam(NULL));
 }
 
@@ -264,16 +301,22 @@ eRetCode DiskCloneUtil::ExecScript(std::string& script) {
     // Start child process
     // Execute diskpart /s script
 
-    string fname = "./" + GenRandomTimeString();
+    string fname = "./" + GenScriptFileName();
     ofstream fstr; fstr.open (fname);
     fstr << script << endl; fstr.close();
+
+    if (DBGMODE)
+        cout << "ScriptFile: " << fname << endl;
 
     stringstream cstr; cstr << "diskpart /s " << fname;
     system(cstr.str().c_str());
     return RET_OK;
 }
 
-static eRetCode CopyPartition(StorageApi::HDL shdl, U64 sadd, U64 size, StorageApi::HDL dhdl, U64 dadd) {
+static eRetCode CopyPartition(
+    StorageApi::HDL shdl, U64 sadd, U64 size,
+    StorageApi::HDL dhdl, U64 dadd,
+    volatile sProgress* p) {
     // Copy data block from src_drv to dst_drv
     if ((size % 512) || (sadd % 512) || (dadd % 512)) return RET_INVALID_ARG;
 
@@ -294,6 +337,7 @@ static eRetCode CopyPartition(StorageApi::HDL shdl, U64 sadd, U64 size, StorageA
     U64 progress = 0;
 
     while(rem_sec) {
+
         wrk_sec = MIN2(wrk_sec, rem_sec);
 
         // copy from src_lba to dst_lba
@@ -303,14 +347,25 @@ static eRetCode CopyPartition(StorageApi::HDL shdl, U64 sadd, U64 size, StorageA
         if (!tmp_size) break;
 
         wrk_sec = tmp_size >> 9; load += wrk_sec;
-        if (load > thr) { load = 0; progress++; }
+
+        UPDATE_AND_RETURN_IF_STOP(p, wrk_sec, RET_ABORTED);
+
+        if (load > thr) {
+            load = 0; progress++;
+
+            if (DBGMODE) cout << "Progress: " << progress << "%" << endl;
+        }
         rem_sec -= wrk_sec;
     }
-
+    if (DBGMODE) {
+        if (!rem_sec) cout << "Progress: 100%";
+        cout << endl;
+    }
     return rem_sec ? RET_FAIL : RET_OK;
 }
 
-eRetCode DiskCloneUtil::ClonePartitions(const sDcDriveInfo& si, const sDcDriveInfo& di) {
+eRetCode DiskCloneUtil::ClonePartitions(
+    const sDcDriveInfo& si, const sDcDriveInfo& di, volatile sProgress* p) {
     U32 pcnt = si.parr.size();
     if (pcnt != di.parr.size()) return StorageApi::RET_INVALID_ARG;
 
@@ -322,7 +377,12 @@ eRetCode DiskCloneUtil::ClonePartitions(const sDcDriveInfo& si, const sDcDriveIn
     for (i = 0; i < pcnt; i++) {
         const sDcPartInfo& sp = si.parr[i];
         const sDcPartInfo& dp = di.parr[i];
-        if (RET_OK != CopyPartition(shdl, sp.start, sp.psize, dhdl, dp.start)) break;
+
+        if (DBGMODE) {
+            cout << "Copy partition " << i << endl;
+        }
+
+        if (RET_OK != CopyPartition(shdl, sp.start, sp.psize, dhdl, dp.start, p)) break;
     }
 
     Close(shdl); Close(dhdl);
@@ -330,25 +390,103 @@ eRetCode DiskCloneUtil::ClonePartitions(const sDcDriveInfo& si, const sDcDriveIn
     return (i == pcnt) ? RET_OK : RET_FAIL;
 }
 
-eRetCode DiskCloneUtil::HandleCloneDrive(CSTR& dstdrv, CSTR& srcdrv,
-                          tConstAddrArray& parr, volatile StorageApi::sProgress* p) {
+static eRetCode InitProgress(const sDcDriveInfo& di, volatile sProgress* p) {
+    // calculate copy size and init progress info
+    U64 ttl_sec = 0;
+    for (U32 i = 0, maxi = di.parr.size(); i < maxi; i++) {
+        const sDcPartInfo& p = di.parr[i];
+        ttl_sec += p.psize >> 9;
+    }
+
+    INIT_PROGRESS(p, ttl_sec);
+    return RET_OK;
+}
+
+eRetCode DiskCloneUtil::HandleCloneDrive(
+    CSTR& dstdrv, CSTR& srcdrv, tConstAddrArray& parr, volatile sProgress* p) {
     U32 sidx, didx;
     if (RET_OK != GetDriveIndex(srcdrv, sidx)) return RET_INVALID_ARG;
     if (RET_OK != GetDriveIndex(dstdrv, didx)) return RET_INVALID_ARG;
 
     sDcDriveInfo si, di; string script;
-    if (RET_OK != DiskCloneUtil::GetDriveInfo(sidx, si)) return RET_FAIL;
-    if (RET_OK != DiskCloneUtil::FilterPartition(parr, si)) return RET_FAIL;
-    if (RET_OK != DiskCloneUtil::GenDestRange(si, didx, di)) return RET_FAIL;
-    if (RET_OK != DiskCloneUtil::RemovePartTable(didx)) return RET_FAIL;
-    if (RET_OK != DiskCloneUtil::GenCreatePartScript(di, script)) return RET_FAIL;
-    if (RET_OK != DiskCloneUtil::ExecScript(script)) return RET_FAIL;
-    if (RET_OK != DiskCloneUtil::ClonePartitions(si, di)) return RET_FAIL;
+    do {
+        if (RET_OK != GetDriveInfo(sidx, si)) break;
+        if (RET_OK != FilterPartition(parr, si)) break;
+        if (RET_OK != GenDestRange(si, didx, di)) break;
 
-    return RET_OK;
+        // count total dst size & update progress
+        if (RET_OK != InitProgress(di, p)) break;
+
+        if (RET_OK != RemovePartTable(didx)) break;
+        if (RET_OK != GenCreatePartScript(di, script)) break;
+        if (RET_OK != ExecScript(script)) break;
+        if (RET_OK != ClonePartitions(si, di)) break;
+        return RET_OK;
+    } while(0);
+
+    if (DBGMODE) cout << "FAIL" << endl;
+
+    if (p && !p->workload) {
+        INIT_PROGRESS(p, 0); FINALIZE_PROGRESS(p, RET_FAIL);
+    }
+
+    return RET_FAIL;
 }
 
+// --------------------------------------------------------------------------------
+// Test Clone Drive
 
+#define ARRAY_SIZE(name) (sizeof(name) / sizeof(name[0]))
+
+eRetCode DiskCloneUtil::TestCloneDrive(U32 didx, U32 sidx, U64 extsize) {
+    string srcdrv = GetDriveName(sidx);
+    string dstdrv = GetDriveName(didx);
+
+    // This is partition_index_number, not index in the src list
+    U32 part_num[] = { 4, 2, 6 }; U32 part_cnt = ARRAY_SIZE(part_num);
+
+    // read srcdrv to get list of partitions
+    // select partitions and build input param
+    // call HandleCLoneDrive
+
+    sDcDriveInfo si;
+    if (RET_OK != GetDriveInfo(sidx, si)) {
+        cout << "Cannot read info from drive " << sidx << endl;
+        return RET_FAIL;
+    }
+
+    tAddrArray parr;
+    for (U32 i = 0; i < part_cnt; i++) {
+        U32 cur_num = part_num[i];
+
+        for (U32 j = 0, maxj = si.parr.size(); j < maxj; j++) {
+            sDcPartInfo& pi = si.parr[j];
+            if (pi.pidx != cur_num) continue;
+            // build start & size params
+            tPartAddr pa;
+            pa.first = pi.start;
+            pa.second = pi.psize + extsize; // rounding ?
+            parr.push_back(pa);
+
+            if (1) {
+                U64 offset = pa.first;
+                U64 length = pa.second;
+
+                if (offset % 512) cout << "Invalid offset (odd) " << endl;
+                if (length % 512) cout << "Invalid length (odd) " << endl;
+
+                cout << "Selecting partition " << cur_num << " ";
+                cout << "offset: " << (offset >> 9) << " (lbas) ";
+                cout << "length: " << (length >> 9) << " (sectors) ";
+                cout << endl;
+            }
+
+            break;
+        }
+    }
+
+    return HandleCloneDrive(dstdrv, srcdrv, parr);
+}
 
 
 

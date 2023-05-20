@@ -65,6 +65,6 @@ bool PartWidget::getPartInfo(StorageApi::tPartAddr& pa) const {
     if (!ctrl.sel->isChecked()) return false;
 
     pa.first = part.addr.first;
-    pa.second = (ctrl.val->value() * 1024 * 1024 * 1024);
+    pa.second = (ctrl.val->value() * 1024 * 1024 * 1024); // convert to bytes
     return true;
 }

@@ -188,6 +188,8 @@ void MainWindow::resetProgress() {
 }
 
 void MainWindow::setProgress(unsigned int val) {
+
+    // map to 31 bit range:
     ctrl.ProgBar->setValue(val);
 }
 
@@ -235,14 +237,19 @@ void MainWindow::waitProcessing(volatile StorageApi::sProgress& prog) {
     while(!prog.ready)
         QCoreApplication::processEvents();
 
+    U32 bitshift = 0;
+    if ((prog.workload * 100) >> 30) {
+        bitshift = 18;
+    }
+
     // set workload info:
-    setProgress(0, prog.workload);
+    setProgress(0, prog.workload >> bitshift);
 
     // polling status
-    StorageApi::U32 curr, prev = prog.progress;
+    StorageApi::U64 curr, prev = prog.progress >> bitshift;
     while(!prog.done) {
         QCoreApplication::processEvents();
-        curr = prog.progress;
+        curr = prog.progress >> bitshift;
         if (prev != curr) {
             prev = curr; setProgress(curr);
         }
@@ -722,9 +729,19 @@ static bool GetSourcePartArray(QListWidget* box, tAddrArray& pa) {
 }
 
 static bool GetTargetDriveInfo(QComboBox* box, string& dst) {
+    DEF_APP_DATA();
     if (!box->count()) return false;
-    dst = box->currentText().toStdString();
-    return true;
+    dst = "";
+    string model = box->currentText().toStdString();
+
+    for (U32 i = 0, maxi = scan.darr.size(); i < maxi; i++) {
+        const sDriveInfo &di = scan.darr[i];
+        if (model == di.id.model) {
+            dst = di.name; return true;
+        }
+    }
+
+    return false;
 }
 
 void MainWindow::showWidget_DiskClone()

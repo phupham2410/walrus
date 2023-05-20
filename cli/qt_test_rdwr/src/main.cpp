@@ -921,6 +921,8 @@ void TestExecScript() {
 
 }
 
+#include "CloneUtil.h"
+
 int main(int argc, char** argv) {
     (void) argc; (void) argv;
 
@@ -938,7 +940,9 @@ int main(int argc, char** argv) {
 
     // TestDiskClone();
 
-    TestReadEfi();
+    // TestReadEfi();
+
+    DiskCloneUtil::TestCloneDrive(2, 0, (0 << 20));
 
     return 0;
 }

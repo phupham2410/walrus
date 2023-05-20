@@ -169,6 +169,9 @@ eRetCode StorageApi::SelfTest(CSTR &drvname, U32 param, volatile sProgress *p) {
     return ProcessTask(p, 3, RET_NOT_IMPLEMENT);
 }
 
+
+#include "CloneUtil.h"
+
 eRetCode StorageApi::CloneDrive(CSTR &dstdrv, CSTR &srcdrv, tConstAddrArray &parr, volatile sProgress *p) {
     (void) dstdrv; (void) srcdrv; (void) parr; (void) p;
 
@@ -178,7 +181,9 @@ eRetCode StorageApi::CloneDrive(CSTR &dstdrv, CSTR &srcdrv, tConstAddrArray &par
     // start diskpart process & run script
     // start copying data
 
-    return ProcessTask(p, 3, RET_NOT_IMPLEMENT);
+    // return ProcessTask(p, 3, RET_NOT_IMPLEMENT);
+
+    return DiskCloneUtil::HandleCloneDrive(dstdrv, srcdrv, parr, p);
 }
 
 // --------------------------------------------------------------------------------
