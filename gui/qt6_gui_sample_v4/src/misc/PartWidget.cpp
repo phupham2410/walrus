@@ -45,7 +45,7 @@ void PartWidget::initWidget() {
 
 void PartWidget::setPart(const StorageApi::sPartition& p) {
     F64 mincap = (p.cap * 100 >> 21) / 100.0;
-    F64 maxcap = maxcap = mincap + 200; // enable to extend 200GB
+    F64 maxcap = mincap + 200; // enable to extend 200GB
 
     wstringstream sstr;
     sstr << mincap << " GB" << endl; sstr << p.name;
@@ -64,7 +64,27 @@ bool PartWidget::getPartInfo(StorageApi::tPartAddr& pa) const {
     pa.first = pa.second = 0;
     if (!ctrl.sel->isChecked()) return false;
 
+    U64 new_byte;
+    double org_gb = ((part.cap * 100) >> 21) / 100.0;
+    double new_gb = ctrl.val->value();
+    if (org_gb >= new_gb) new_byte = part.cap << 9;
+    else new_byte = new_gb * 1024 * 1024 * 1024;
+
     pa.first = part.addr.first;
-    pa.second = (ctrl.val->value() * 1024 * 1024 * 1024); // convert to bytes
+    pa.second = new_byte;
     return true;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+

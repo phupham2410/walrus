@@ -44,6 +44,7 @@ namespace DiskCloneUtil { // DC
     StorageApi::eRetCode RemovePartTable(U32 dstidx);
     StorageApi::eRetCode GenCreatePartScript(const sDcDriveInfo& di, std::string& script);
     StorageApi::eRetCode ExecScript(std::string& script);
+    StorageApi::eRetCode VerifyPartition(U32 dstidx, const sDcDriveInfo& di);
     StorageApi::eRetCode ClonePartitions(
         const sDcDriveInfo& si, const sDcDriveInfo& di,
         volatile StorageApi::sProgress* p = NULL);
