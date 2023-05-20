@@ -190,6 +190,8 @@ static eRetCode MatchPartition(U64 addr, U64 size, const sDcDriveInfo& si, U32& 
 #define CAP1KB (1 << 10)
 #define CAP100KB (100 << 10)
 
+#define MSK1MB (~CAP1MB)
+
 eRetCode DiskCloneUtil::FilterPartition(tConstAddrArray &parr, sDcDriveInfo& si) {
     vector<sDcPartInfo> out;
     set<U64> aset; // address map: address -> size;
@@ -223,6 +225,10 @@ eRetCode DiskCloneUtil::GenDestRange(const sDcDriveInfo& si, U32 dstidx, sDcDriv
         d.start = start; d.psize = d.nsize = s.nsize;
         di.parr.push_back(d);
         start = start + (d.psize + gap);
+        if (DBGMODE) {
+            if (d.start & MSK1MB)
+                cout << "ERROR: Offset must be MB aligned" << endl;
+        }
     }
     return di.parr.size() ? RET_OK : RET_EMPTY;
 }
@@ -329,7 +335,7 @@ static eRetCode ExecCommand(const string& cmd) {
     si.cb = sizeof(si);
 
     cmdline = strdup(cmd.c_str());
-    program = strdup(cmd.c_str());
+    program = "cmd"; strdup(cmd.c_str());
 
     if (CreateProcessA(program, cmdline, NULL, NULL, 0, 0, NULL, NULL, &si, &pi))
     {
