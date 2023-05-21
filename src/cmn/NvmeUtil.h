@@ -6,7 +6,7 @@
 #include "CmdBase.h"
 
 #include <windows.h>
-#include "winioctl.h"
+#include <winioctl.h>
 #include <ntddscsi.h>
 #include <nvme.h>
 
@@ -398,7 +398,11 @@ typedef enum _eDataTransferDirection
 } eDataTransferDirection;
 
 typedef struct _tScsiPassThroughIOStruct {
-    SCSI_PASS_THROUGH           scsiPassthrough;
+    union
+    {
+        SCSI_PASS_THROUGH_DIRECT    scsiPassthroughDirect;
+        SCSI_PASS_THROUGH           scsiPassthrough;
+    };
     ULONG                       padding;
     UCHAR                       senseBuffer[SPC3_SENSE_LEN];
     UCHAR                       dataBuffer[1];
@@ -460,6 +464,7 @@ typedef enum _eSenseFormat{
 } eSenseFormat;
 
 typedef struct _tScsiContext {
+    const char   *driveName;
     HANDLE          hDevice;
     ULONG           alignmentMask;
     UCHAR           srbType;
@@ -499,9 +504,11 @@ public:
     static BOOL ScsiSanitizeCmd(tScsiContext *scsiCtx, eScsiSanitizeType sanitizeType, bool immediate, bool znr, bool ause, uint16_t parameterListLength, uint8_t *ptrData);
 
     // Firmware update
-    static BOOL win10FW_GetfwdlInfoQuery(HANDLE hHandle, PSTORAGE_HW_FIRMWARE_INFO fwdlInfo, BOOL isNvme);
+    static BOOL win10FW_GetfwdlInfoQuery(HANDLE hHandle, PSTORAGE_HW_FIRMWARE_INFO fwdlInfo, BOOL isNvme, PBYTE pFwupdateSlotId);
     static BOOL win10FW_TransferFile(HANDLE hHandle, PSTORAGE_HW_FIRMWARE_INFO fwdlInfo, BYTE slotId, LPCWSTR fwFileName, int64_t transize);
     static BOOL win10FW_Active(HANDLE hHandle, PSTORAGE_HW_FIRMWARE_INFO fwdlInfo, BYTE slotId);
+
+    static BOOL Deallocate(HANDLE hHandle);
 };
 
 #endif // NvmeUtil_H

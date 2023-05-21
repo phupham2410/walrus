@@ -4,5 +4,6 @@
 
 bool SystemUtil::IsAdminMode()
 {
-    return IsUserAnAdmin ();
+    return true;
+    //return IsUserAnAdmin ();
 }

@@ -60,6 +60,4 @@ HEADERS += \
     ../../src/cmn/DeviceMgr.h \
     ../../src/cmn/HexFrmt.h
 
-HEADERS += \
-    ../../src/cmn/winioctl.h\
-    ../../src/cmn/nvme.h
+HEADERS +=

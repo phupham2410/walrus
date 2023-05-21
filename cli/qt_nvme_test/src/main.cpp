@@ -191,6 +191,7 @@ void identifyNamespace(HANDLE hHandle) {
     if (NvmeUtil::IdentifyNamespace(hHandle, 1, &namespaceData)) {
         std::cout << "NSZE " << namespaceData.NSZE << std::endl;
         std::cout << "NCAP " << namespaceData.NCAP << std::endl;
+        std::cout << "NSFEAT.DeallocatedOrUnwrittenError " << (unsigned int)namespaceData.NSFEAT.DeallocatedOrUnwrittenError << std::endl;
     } else {
         std::cout << "Failure to read namespace identify" << std::endl;
     }
@@ -232,12 +233,12 @@ void identifyController(HANDLE hHandle) {
         std::cout << "fromat.FormatApplyToAll:" << (unsigned int)controllerData.FNA.FormatApplyToAll << std::endl;
         std::cout << "fromat.SecureEraseApplyToAll:" << (unsigned int)controllerData.FNA.SecureEraseApplyToAll << std::endl;
         std::cout << "fromat.CryptographicEraseSupported:" << (unsigned int)controllerData.FNA.CryptographicEraseSupported << std::endl;
-        std::cout << "fromat.FormatSupportNSIDAllF:" << (unsigned int)controllerData.FNA.FormatSupportNSIDAllF << std::endl;
+        //std::cout << "fromat.FormatSupportNSIDAllF:" << (unsigned int)controllerData.FNA.FormatSupportNSIDAllF << std::endl;
 
         std::cout << "SANICAP.CryptoErase:" << (unsigned int)controllerData.SANICAP.CryptoErase << std::endl;
         std::cout << "SANICAP.BlockErase:" << (unsigned int)controllerData.SANICAP.BlockErase << std::endl;
         std::cout << "SANICAP.Overwrite:" << (unsigned int)controllerData.SANICAP.Overwrite << std::endl;
-        std::cout << "SANICAP.NDI:" << (unsigned int)controllerData.SANICAP.NDI << std::endl;
+        //std::cout << "SANICAP.NDI:" << (unsigned int)controllerData.SANICAP.NDI << std::endl;
         std::cout << "FRMW.SlotCount" <<(unsigned int) controllerData.FRMW.SlotCount << std::endl;
          std::cout << "FRMW.Slot1ReadOnly" <<(unsigned int) controllerData.FRMW.Slot1ReadOnly << std::endl;
 
@@ -331,17 +332,19 @@ void identifyNSIDList(HANDLE hHandle) {
 
 // same identifyNSIDList() - list all active NSIDs via SCSI passthrough
 void reportLuns(HANDLE hHandle) {
-    uint32_t reportLunsDataSize = 16 + 50*8; // Be carefully with this value ,
+    uint32_t reportLunsDataSize = 16 + 200*8; // Be carefully with this value ,
                                             // not sure why if we increase or reduce this will break the DeviceIOControl Function
     uint8_t* reportLunsData =  C_CAST(uint8_t*, calloc_aligned(reportLunsDataSize, sizeof(uint8_t), 8)); //malloc(reportLunsDataSize));
-    uint32_t dataSize = 40;
+    uint32_t dataSize = 100;
     uint8_t* ptrData =  C_CAST(uint8_t*,  calloc_aligned(dataSize, sizeof(uint8_t), 8));
 
     std::cout << "\n-----List all NSID listt:------\n";
 
     tScsiContext * scsiContext =  (tScsiContext *) malloc(sizeof(tScsiContext));
+    ZeroMemory(scsiContext,  sizeof(tScsiContext));
     scsiContext->hDevice = hHandle;
-    ZeroMemory(ptrData,  dataSize * 4);
+    scsiContext->timeout = 0;
+    ZeroMemory(ptrData,  dataSize);
     if (!QueryPropertyForDevice(hHandle, &scsiContext->alignmentMask, &scsiContext->srbType)) {
         std::cout << "Failed to QueryPropertyForDevice() \n";
         return;
@@ -386,7 +389,8 @@ void doFWDownloadFull(HANDLE hHandle) {
     //LPCWSTR fileName = L"D:/FromHiptech/EIFM31.6.bin"; // TODO - change file here
     LPCWSTR fileName = L"D:/FromHiptech/FW Bin file/Force MP600/EGFM15.0.bin";
     int64_t transferSize = 4096;
-    if (!NvmeUtil::win10FW_GetfwdlInfoQuery(hHandle, &fwdlInfo, TRUE)) {
+    BYTE slotId;
+    if (!NvmeUtil::win10FW_GetfwdlInfoQuery(hHandle, &fwdlInfo, TRUE, &slotId)) {
         std::cout << "win10FW_GetfwdlInfoQuery failed:";
         print_Windows_Error_To_Screen(GetLastError());
         return;
@@ -396,8 +400,8 @@ void doFWDownloadFull(HANDLE hHandle) {
         transferSize = fwdlInfo.ImagePayloadAlignment;
     }
     std::cout << "====== FW download: ==========\n";
-#if 0
-    if (!NvmeUtil::win10FW_TransferFile(hHandle, &fwdlInfo, 1, fileName, transferSize)) {
+#if 1
+    if (!NvmeUtil::win10FW_TransferFile(hHandle, &fwdlInfo, slotId, fileName, transferSize)) {
         std::cout << "fwWin10Download failed:";
         print_Windows_Error_To_Screen(GetLastError());
         return;
@@ -405,7 +409,7 @@ void doFWDownloadFull(HANDLE hHandle) {
 
     std::cout << "====== FW Activate: ==========\n";
 
-    if (!NvmeUtil::win10FW_Active(hHandle,   &fwdlInfo, 1)) {
+    if (!NvmeUtil::win10FW_Active(hHandle,   &fwdlInfo, slotId)) {
             std::cout << "FW download failed at activate:";
             print_Windows_Error_To_Screen(GetLastError());
             return;
@@ -414,6 +418,60 @@ void doFWDownloadFull(HANDLE hHandle) {
     std::cout << "FW download done\n";
 }
 
+// same identifyNSIDList() - list all active NSIDs via SCSI passthrough
+void format(HANDLE hHandle) {
+
+    std::cout << "\n-----List all NSID listt:------\n";
+
+    tScsiContext * scsiContext =  (tScsiContext *) malloc(sizeof(tScsiContext));
+    ZeroMemory(scsiContext,  sizeof(tScsiContext));
+    scsiContext->hDevice = hHandle;
+    scsiContext->timeout = 0;
+    scsiContext->driveName = DRIVENAME;
+
+    if (!QueryPropertyForDevice(hHandle, &scsiContext->alignmentMask, &scsiContext->srbType)) {
+            std::cout << "Failed to QueryPropertyForDevice() \n";
+            return;
+    }
+    std::cout << "alignmentMask:" << (ULONG)scsiContext->alignmentMask << std::endl;
+    std::cout << "srbType:" <<  (ULONG)scsiContext->srbType << std::endl;
+
+    if (!NvmeUtil::GetSCSIAAddress(hHandle, &scsiContext->scsiAddr)) {
+            std::cout << "Failed to get GetSCSIAAddress" << std::endl;
+            return;
+    }
+
+    if (TRUE == NvmeUtil::ScsiSanitizeCmd(scsiContext, SCSI_SANITIZE_CRYPTOGRAPHIC_ERASE, false, false, false, 0, NULL)) {
+            std::cout << "ok\n";
+    } else {
+            std::cout << "===> Fail to ScsiSanitizeCmd :";
+            print_Windows_Error_To_Screen(scsiContext->lastError);
+
+    }
+
+
+}
+
+void trim(HANDLE hHandle) {
+    ULONG returnedLength = 0;
+    DEVICE_TRIM_DESCRIPTOR trim_d = { 0 };
+    if (!DeviceIoControl(hHandle, IOCTL_STORAGE_QUERY_PROPERTY, &trim_d, sizeof(DEVICE_TRIM_DESCRIPTOR), &trim_d, sizeof(trim_d), &returnedLength, NULL)) {
+        printf("Error on DeviceIoControl IOCTL_STORAGE_QUERY_PROPERTY Trim Property [%lu] ", returnedLength);
+        return;
+    }
+    std::cout<< "trim.Enabled:" << (unsigned int)trim_d.TrimEnabled  << std::endl;
+#if 0
+    if (TRUE == NvmeUtil::Deallocate(hHandle)) {
+            std::cout << "Trim ok\n";
+    } else {
+            std::cout << "===> Fail to Trim :";
+            print_Windows_Error_To_Screen(GetLastError());
+
+    }
+#endif
+}
+
+
 int main(int argc, char** argv) {
     tHdl iHandle;
     HANDLE hHandle;
@@ -421,20 +479,23 @@ int main(int argc, char** argv) {
 
     status = DeviceMgr::OpenDevice(DRIVENAME, iHandle);
     if (!status) {
+        print_Windows_Error_To_Screen(GetLastError());
         goto exit_error;
     }
 
     hHandle = (HANDLE)iHandle;
 
-    //identifyNamespace(hHandle);
+    identifyNamespace(hHandle);
     identifyController(hHandle);
     //getHealthInfoLog(hHandle);
     //doSelftest(hHandle);
     //identifyNSIDList(hHandle);
 
-    doFWDownloadFull(hHandle);
+    //doFWDownloadFull(h);
 
-    //reportLuns(hHandle);
+    reportLuns(hHandle);
+    format(hHandle);
+    //trim(hHandle);
 
     if (hHandle != INVALID_HANDLE_VALUE) {
         DeviceMgr::CloseDevice(iHandle);

@@ -4,7 +4,53 @@
 #include <winioctl.h>
 #include <ntddscsi.h>
 #include<winerror.h>
+#include <tchar.h>
 using namespace std;
+
+static void PrintDataBuffer(PUCHAR DataBuffer, ULONG BufferLength)
+{
+    ULONG Cnt;
+    UCHAR Str[32] = { 0 };
+
+    fprintf(stdout, "        00  01  02  03  04  05  06  07   08  09  0A  0B  0C  0D  0E  0F\n");
+    fprintf(stdout, "        ---------------------------------------------------------------\n");
+
+    int i = 0;
+    for (Cnt = 0; Cnt < BufferLength; Cnt++)
+    {
+        // print address
+        if ((Cnt) % 16 == 0)
+        {
+            fprintf(stdout, " 0x%03X  ", Cnt);
+        }
+
+        // print hex data
+        fprintf(stdout, "%02X  ", DataBuffer[Cnt]);
+        if (isprint(DataBuffer[Cnt]))
+        {
+            Str[i] = DataBuffer[Cnt];
+        }
+        else
+        {
+            Str[i] = '.';
+        }
+        i++;
+        if ((Cnt + 1) % 8 == 0)
+        {
+            fprintf(stdout, " ");
+            Str[i++] = ' ';
+        }
+
+        // print ascii character if printable
+        if ((Cnt + 1) % 16 == 0)
+        {
+            Str[i++] = '\0';
+            i = 0;
+            fprintf(stdout, "%s\n", Str);
+        }
+    }
+    fprintf(stdout, "\n\n");
+}
 
 BOOL NvmeUtil::IdentifyNamespace(HANDLE hDevice, DWORD dwNSID, PNVME_IDENTIFY_NAMESPACE_DATA pNamespaceIdentify) {
     BOOL    result = FALSE;
@@ -521,6 +567,9 @@ BOOL NvmeUtil::GetSCSIAAddress(HANDLE hDevice, PSCSI_ADDRESS pScsiAddress)
     return result;
 }
 
+#define SRB_FLAGS_DATA_IN                   0x00000040
+#define SRB_FLAGS_DATA_OUT                  0x00000080
+
 static BOOL sendSCSIPassThrough(tScsiContext *scsiCtx)
 {
     BOOL          ret = FALSE;
@@ -539,7 +588,7 @@ static BOOL sendSCSIPassThrough(tScsiContext *scsiCtx)
     sptdioDB->scsiPassthrough.TargetId = scsiCtx->scsiAddr.TargetId;
     sptdioDB->scsiPassthrough.Lun = scsiCtx->scsiAddr.Lun;
     sptdioDB->scsiPassthrough.CdbLength = scsiCtx->cdbLength;
-    sptdioDB->scsiPassthrough.ScsiStatus = 255;
+    sptdioDB->scsiPassthrough.ScsiStatus = 0;
     sptdioDB->scsiPassthrough.SenseInfoLength = C_CAST(UCHAR, scsiCtx->senseDataSize);
     ZeroMemory(sptdioDB->senseBuffer, SPC3_SENSE_LEN);
 
@@ -609,6 +658,154 @@ static BOOL sendSCSIPassThrough(tScsiContext *scsiCtx)
     if (success) {
         ret = TRUE;
         if (scsiCtx->pdata && scsiCtx->direction == XFER_DATA_IN) {
+            memcpy(scsiCtx->pdata, sptdioDB->dataBuffer, scsiCtx->dataLength);
+        }
+    } else {
+        ret = FALSE;
+    }
+    scsiCtx->returnStatus.senseKey = sptdioDB->scsiPassthrough.ScsiStatus;
+
+    // Any sense data?
+    if (scsiCtx->psense != NULL && scsiCtx->senseDataSize > 0) {
+        memcpy(scsiCtx->psense, sptdioDB->senseBuffer, M_Min(sptdioDB->scsiPassthrough.SenseInfoLength, scsiCtx->senseDataSize));
+    }
+
+    if (scsiCtx->psense != NULL) {
+        scsiCtx->returnStatus.format = scsiCtx->psense[0];
+        switch (scsiCtx->returnStatus.format & 0x7F) {
+        case SCSI_SENSE_CUR_INFO_FIXED:
+        case SCSI_SENSE_DEFER_ERR_FIXED:
+            scsiCtx->returnStatus.senseKey = scsiCtx->psense[2] & 0x0F;
+            scsiCtx->returnStatus.asc = scsiCtx->psense[12];
+            scsiCtx->returnStatus.ascq = scsiCtx->psense[13];
+            break;
+        case SCSI_SENSE_CUR_INFO_DESC:
+        case SCSI_SENSE_DEFER_ERR_DESC:
+            scsiCtx->returnStatus.senseKey = scsiCtx->psense[1] & 0x0F;
+            scsiCtx->returnStatus.asc = scsiCtx->psense[2];
+            scsiCtx->returnStatus.ascq = scsiCtx->psense[3];
+            break;
+        }
+    }
+
+    std::cout << "sptdioDB->scsiPassthrough.ScsiStatus:" << ( unsigned int )sptdioDB->scsiPassthrough.ScsiStatus << std::endl;
+    std::cout << "returnStatus.format:" <<  ( unsigned int )scsiCtx->returnStatus.format << std::endl;
+    std::cout << "returnStatus.senseKey:" <<  ( unsigned int )scsiCtx->returnStatus.senseKey << std::endl;
+    std::cout << "scsiCtx->returnStatus.asc:" << ( unsigned int ) scsiCtx->returnStatus.asc << std::endl;
+    std::cout << "scsiCtx->returnStatus.ascq:" << ( unsigned int ) scsiCtx->returnStatus.ascq << std::endl;
+
+    safe_Free(sptdioDB);
+
+    return ret;
+}
+
+
+static BOOL scsiCtx_Direct(tScsiContext *scsiCtx)
+{
+    BOOL          ret = FALSE;
+    BOOL          success = FALSE;
+    ULONG         returned_data = 0;
+    tScsiPassThroughIOStruct* sptdioDB = (tScsiPassThroughIOStruct*) malloc(sizeof(tScsiPassThroughIOStruct));
+    bool localAlignedBuffer = false;
+    uint8_t *alignedPointer = scsiCtx->pdata;
+    uint8_t *localBuffer = NULL;//we need to save this to free up the memory properly later.
+    //Check the alignment...if we need to use a local buffer, we'll use one, then copy the data back
+    if (scsiCtx->pdata && scsiCtx->alignmentMask != 0)
+    {
+        //This means the driver requires some sort of aligned pointer for the data buffer...so let's check and make sure that the user's pointer is aligned
+        //If the user's pointer isn't aligned properly, align something local that is aligned to meet the driver's requirements, then copy data back for them.
+        alignedPointer = C_CAST(uint8_t*, (C_CAST(UINT_PTR, scsiCtx->pdata) + C_CAST(UINT_PTR, scsiCtx->alignmentMask)) & ~C_CAST(UINT_PTR, scsiCtx->alignmentMask));
+        if (alignedPointer != scsiCtx->pdata)
+        {
+            localAlignedBuffer = true;
+            uint32_t totalBufferSize = scsiCtx->dataLength + C_CAST(uint32_t, scsiCtx->alignmentMask);
+            localBuffer = C_CAST(uint8_t*, calloc(totalBufferSize, sizeof(uint8_t)));//TODO: If we want to remove allocating more memory, we should investigate making the scsiCtx->pdata a double pointer so we can reallocate it for the user.
+            if (!localBuffer)
+            {
+                perror("error allocating aligned buffer for ATA Passthrough Direct...attempting to use user's pointer.");
+                localAlignedBuffer = false;
+                alignedPointer = scsiCtx->pdata;
+            }
+            else
+            {
+                alignedPointer = C_CAST(uint8_t*, (C_CAST(UINT_PTR, localBuffer) + C_CAST(UINT_PTR, scsiCtx->alignmentMask)) & ~C_CAST(UINT_PTR, scsiCtx->alignmentMask));
+                if (scsiCtx->direction == XFER_DATA_OUT)
+                {
+                    memcpy(alignedPointer, scsiCtx->pdata, scsiCtx->dataLength);
+                }
+            }
+        }
+    }
+
+    if (!sptdioDB) {
+        return FALSE;
+    }
+
+
+    memset(sptdioDB, 0, sizeof(tScsiPassThroughIOStruct));
+
+    sptdioDB->scsiPassthroughDirect.Length = sizeof(SCSI_PASS_THROUGH_DIRECT);
+    sptdioDB->scsiPassthroughDirect.PathId = scsiCtx->scsiAddr.PathId;
+    sptdioDB->scsiPassthroughDirect.TargetId = scsiCtx->scsiAddr.TargetId;
+    sptdioDB->scsiPassthroughDirect.Lun = scsiCtx->scsiAddr.Lun;
+    sptdioDB->scsiPassthroughDirect.CdbLength = scsiCtx->cdbLength;
+    sptdioDB->scsiPassthroughDirect.ScsiStatus = 255;
+    sptdioDB->scsiPassthroughDirect.SenseInfoLength = C_CAST(UCHAR, scsiCtx->senseDataSize);
+    ZeroMemory(sptdioDB->senseBuffer, SPC3_SENSE_LEN);
+
+    switch (scsiCtx->direction)
+    {
+    case XFER_DATA_IN:
+        sptdioDB->scsiPassthroughDirect.DataIn = SCSI_IOCTL_DATA_IN;
+        sptdioDB->scsiPassthroughDirect.DataTransferLength = scsiCtx->dataLength;
+        sptdioDB->scsiPassthroughDirect.DataBuffer = alignedPointer;
+        break;
+    case XFER_DATA_OUT:
+        sptdioDB->scsiPassthroughDirect.DataIn = SCSI_IOCTL_DATA_OUT;
+        sptdioDB->scsiPassthroughDirect.DataTransferLength = scsiCtx->dataLength;
+        sptdioDB->scsiPassthroughDirect.DataBuffer = alignedPointer;
+        break;
+    case XFER_NO_DATA:
+        sptdioDB->scsiPassthroughDirect.DataIn = SCSI_IOCTL_DATA_UNSPECIFIED;
+        sptdioDB->scsiPassthroughDirect.DataTransferLength = 0;
+        sptdioDB->scsiPassthroughDirect.DataBuffer = NULL;
+        break;
+    default:
+        return FALSE;
+
+    }
+
+    if (scsiCtx->timeout != 0) {
+        sptdioDB->scsiPassthroughDirect.TimeOutValue = scsiCtx->timeout;
+    }
+    else {
+        sptdioDB->scsiPassthroughDirect.TimeOutValue = 15;
+    }
+
+
+    sptdioDB->scsiPassthroughDirect.SenseInfoOffset = offsetof(tScsiPassThroughIOStruct, senseBuffer);
+    memcpy(sptdioDB->scsiPassthroughDirect.Cdb, scsiCtx->cdb, sizeof(sptdioDB->scsiPassthroughDirect.Cdb));
+
+    //clear any cached errors before we try to send the command
+    SetLastError(ERROR_SUCCESS);
+    scsiCtx->lastError = 0;
+
+    DWORD scsiPassThroughBufLen = sizeof(tScsiPassThroughIOStruct);
+
+
+    success = DeviceIoControl(scsiCtx->hDevice,
+                              IOCTL_SCSI_PASS_THROUGH_DIRECT,
+                              &sptdioDB->scsiPassthroughDirect,
+                              scsiPassThroughBufLen,
+                              &sptdioDB->scsiPassthroughDirect,
+                              scsiPassThroughBufLen,
+                              &returned_data,
+                              NULL);
+    scsiCtx->lastError = GetLastError();
+
+    if (success) {
+        ret = TRUE;
+        if (scsiCtx->pdata && scsiCtx->direction == XFER_DATA_IN && localAlignedBuffer) {
             memcpy(scsiCtx->pdata, sptdioDB->dataBuffer, scsiCtx->dataLength);
         }
     } else {
@@ -816,7 +1013,9 @@ static BOOL scsiSendCdb(tScsiContext *scsiCtx, uint8_t *cdb, eCDBLen cdbLen, uin
     scsiCtx->pdata = pdata;
     scsiCtx->dataLength = dataLen;
     if (scsiCtx->srbType == SRB_TYPE_STORAGE_REQUEST_BLOCK) {
-        ret = sendSCSIPassThrough_EX(scsiCtx);
+        std::cout << "Try sendSCSIPassThrough_EX\n";
+         ret = sendSCSIPassThrough(scsiCtx);
+       // ret = sendSCSIPassThrough_EX(scsiCtx);
     } else {
         ret = sendSCSIPassThrough(scsiCtx);
     }
@@ -831,6 +1030,7 @@ static BOOL scsiSendCdb(tScsiContext *scsiCtx, uint8_t *cdb, eCDBLen cdbLen, uin
 BOOL NvmeUtil::ScsiReportLuns(tScsiContext *scsiCtx, uint8_t selectReport, uint32_t allocationLength, uint8_t *ptrData) {
     BOOL       result = FALSE;
     uint8_t   cdb[CDB_LEN_12] = { 0 };
+    scsiCtx->senseDataSize = SPC3_SENSE_LEN;
 
     // Set up the CDB.
     cdb[SCSI_OPERATION_CODE] = REPORT_LUNS_CMD;
@@ -856,15 +1056,209 @@ BOOL NvmeUtil::ScsiReportLuns(tScsiContext *scsiCtx, uint8_t selectReport, uint3
     return result;
 }
 
+#define MAX_VOL_BITS (32)
+#define MAX_VOL_STR_LEN (8)
+#define MAX_DISK_EXTENTS (32)
+#define WIN_PHYSICAL_DRIVE  "\\\\.\\PhysicalDrive"
+
+BOOL os_Unmount_File_Systems_On_Device(tScsiContext *scsiCtx)
+{
+    BOOL ret = TRUE;
+    DWORD driveLetters = 0;
+    TCHAR currentLetter = 'A';
+    uint32_t volumeCounter = 0;
+    uint32_t os_drive_number = UINT32_MAX;
+    uint32_t volumeBitField = 0;
+    sscanf_s(scsiCtx->driveName, WIN_PHYSICAL_DRIVE "%u" , &os_drive_number);
+
+
+    driveLetters = GetLogicalDrives();//TODO: This will remount everything. If we can figure out a better way to do this, we should so that not everything is remounted. - TJE
+
+    uint8_t volIter = 0;
+    for (volIter = 0; volIter < MAX_VOL_BITS; ++volIter, ++currentLetter, ++volumeCounter)
+    {
+        if (M_BitN(volIter) & driveLetters)
+        {
+            //a volume with this letter exists...check it's physical device number
+            TCHAR volume_name[MAX_VOL_STR_LEN] = { 0 };
+            TCHAR *ptrLetterName = &volume_name[0];
+            _sntprintf_s(ptrLetterName, MAX_VOL_STR_LEN, _TRUNCATE, TEXT("\\\\.\\%c:"), currentLetter);
+            HANDLE letterHandle = CreateFile(ptrLetterName,
+                                             GENERIC_WRITE | GENERIC_READ,
+                                             FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                             NULL,
+                                             OPEN_EXISTING,
+                                             //#if !defined(WINDOWS_DISABLE_OVERLAPPED)
+                                             //                    FILE_FLAG_OVERLAPPED,
+                                             //#else
+                                             0,
+                                             //#endif
+                                             NULL);
+            if (letterHandle != INVALID_HANDLE_VALUE)
+            {
+                DWORD returnedBytes = 0;
+                DWORD maxExtents = MAX_DISK_EXTENTS;//https://technet.microsoft.com/en-us/library/cc772180(v=ws.11).aspx
+                PVOLUME_DISK_EXTENTS diskExtents = NULL;
+                DWORD diskExtentsSizeBytes = sizeof(VOLUME_DISK_EXTENTS) + (sizeof(DISK_EXTENT) * maxExtents);
+                diskExtents = C_CAST(PVOLUME_DISK_EXTENTS, malloc(diskExtentsSizeBytes));
+                if (diskExtents)
+                {
+                    memset(diskExtents, 0, diskExtentsSizeBytes);
+                    if (DeviceIoControl(letterHandle, IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS, NULL, 0, diskExtents, diskExtentsSizeBytes, &returnedBytes, NULL))
+                    {
+                        for (DWORD counter = 0; counter < diskExtents->NumberOfDiskExtents; ++counter)
+                        {
+                            if (diskExtents->Extents[counter].DiskNumber == os_drive_number)
+                            {
+
+                                //Set a bit to note that this particular volume (letter) is on this device
+                                volumeBitField |= (UINT32_C(1) << volumeCounter);
+
+                                //now we need to determine if this volume has the system directory on it.
+                                TCHAR systemDirectoryPath[MAX_PATH] = { 0 };
+
+                                if (GetSystemDirectory(systemDirectoryPath, MAX_PATH) > 0)
+                                {
+                                    if (_tcslen(systemDirectoryPath) > 0)
+                                    {
+                                        //we need to check only the first letter of the returned string since this is the volume letter
+                                        if (systemDirectoryPath[0] == currentLetter)
+                                        {
+                                            //This volume contains a system directory
+
+                                        }
+                                    }
+
+                                }
+                            }
+                        }
+                    }
+                    //DWORD lastError = GetLastError();
+                    safe_Free(diskExtents)
+                }
+            }
+            CloseHandle(letterHandle);
+        }
+    }
+
+    //If the volume bitfield is blank, then there is nothing to unmount - TJE
+    if (volumeBitField > 0)
+    {
+        //go through each bit in the bitfield. Bit0 = A, BIT1 = B, BIT2 = C, etc
+        //unmount each volume for the specified device.
+        uint8_t volIter = 0;
+        TCHAR volumeLetter = 'A';//always start with A
+        for (volIter = 0; volIter < MAX_VOL_BITS; ++volIter, ++volumeLetter)
+        {
+            if (M_BitN(volIter) & volumeBitField)
+            {
+                //found a volume.
+                //Steps:
+                //1. open handle to the volume
+                //2. lock the volume: FSCTL_LOCK_VOLUME
+                //3. dismount volume: FSCTL_DISMOUNT_VOLUME
+                //4. unlock the volume: FSCTL_UNLOCK_VOLUME
+                //5. close the handle to the volume
+                HANDLE volumeHandle = INVALID_HANDLE_VALUE;
+                DWORD bytesReturned = 0;
+                TCHAR volumeHandleString[MAX_VOL_STR_LEN] = { 0 };
+                _sntprintf_s(volumeHandleString, MAX_VOL_STR_LEN, _TRUNCATE, TEXT("\\\\.\\%c:"), volumeLetter);
+                volumeHandle = CreateFile(volumeHandleString, GENERIC_WRITE | GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
+                if (INVALID_HANDLE_VALUE != volumeHandle)
+                {
+                    BOOL ioctlResult = FALSE, lockResult = FALSE;
+                    lockResult = DeviceIoControl(volumeHandle, FSCTL_LOCK_VOLUME, NULL, 0, NULL, 0, &bytesReturned, NULL);
+                    if (lockResult == FALSE)
+                    {
+
+                            _tprintf(TEXT("WARNING: Unable to lock volume: %s\n"), volumeHandleString);
+
+                    }
+                    ioctlResult = DeviceIoControl(volumeHandle, FSCTL_DISMOUNT_VOLUME, NULL, 0, NULL, 0, &bytesReturned, NULL);
+                    if (ioctlResult == FALSE)
+                    {
+
+                            _tprintf(TEXT("Error: Unable to dismount volume: %s\n"), volumeHandleString);
+
+                        ret = FALSE;
+                    }
+                    if (lockResult == TRUE)
+                    {
+                        ioctlResult = DeviceIoControl(volumeHandle, FSCTL_UNLOCK_VOLUME, NULL, 0, NULL, 0, &bytesReturned, NULL);
+                        if (ioctlResult == FALSE)
+                        {
+
+                                _tprintf(TEXT("WARNING: Unable to unlock volume: %s\n"), volumeHandleString);
+
+                        }
+                    }
+                    CloseHandle(volumeHandle);
+                    volumeHandle = INVALID_HANDLE_VALUE;
+                }
+            }
+        }
+    }
+    return ret;
+}
+
+//TODO: We may need to switch between locking fd and scsiSrbHandle in some way...for now just locking fd value.
+//https://docs.microsoft.com/en-us/windows/win32/api/winioctl/ni-winioctl-fsctl_lock_volume
+BOOL os_Lock_Device(tScsiContext *scsiCtx)
+{
+    BOOL ret = TRUE;
+    DWORD returnedBytes = 0;
+    if (!DeviceIoControl(scsiCtx->hDevice, FSCTL_LOCK_VOLUME, NULL, 0, NULL, 0, &returnedBytes, NULL))
+    {
+        //This can fail is files are open, it's a system disk, or has a pagefile.
+        ret = FALSE;
+    }
+    return ret;
+}
+
+BOOL os_Unlock_Device(tScsiContext *scsiCtx)
+{
+    BOOL ret = TRUE;
+    DWORD returnedBytes = 0;
+    if (!DeviceIoControl(scsiCtx->hDevice, FSCTL_UNLOCK_VOLUME, NULL, 0, NULL, 0, &returnedBytes, NULL))
+    {
+        ret = FALSE;
+    }
+    return ret;
+}
+
+ BOOL os_Update_File_System_Cache(tScsiContext *scsiCtx)
+{
+   BOOL ret = TRUE;
+    DWORD returnedBytes = 0;
+   if (!DeviceIoControl(scsiCtx->hDevice, IOCTL_DISK_UPDATE_PROPERTIES, NULL, 0, NULL, 0, &returnedBytes, NULL))
+    {
+        ret = FALSE;
+    }
+    return ret;
+}
+
 
 BOOL NvmeUtil::ScsiSanitizeCmd(tScsiContext *scsiCtx, eScsiSanitizeType sanitizeType, bool immediate, bool znr, bool ause, uint16_t parameterListLength, uint8_t *ptrData)
 {
     BOOL       result       = FALSE;
     uint8_t   cdb[CDB_LEN_10]       = { 0 };
     eDataTransferDirection dataDir = XFER_NO_DATA;
+    result = os_Lock_Device(scsiCtx);
+    if (!result) {
+        std::cout<<" Lock device failed" <<std::endl;
+        return result;
+    }
+
+    result = os_Unmount_File_Systems_On_Device(scsiCtx);
+
+    if (!result) {
+        std::cout<<" Lock filesystem failed" <<std::endl;
+        return result;
+    }
+    result       = FALSE;
+    scsiCtx->senseDataSize = SPC3_SENSE_LEN;
 
     memset(scsiCtx->lastCommandSenseData, 0, scsiCtx->senseDataSize);
-
 
     cdb[SCSI_OPERATION_CODE] = SANITIZE_CMD;
     cdb[1] = sanitizeType & 0x1F;
@@ -897,16 +1291,16 @@ BOOL NvmeUtil::ScsiSanitizeCmd(tScsiContext *scsiCtx, eScsiSanitizeType sanitize
     }
 
     result = scsiSendCdb(scsiCtx, &cdb[0], (eCDBLen)sizeof(cdb), ptrData, parameterListLength, dataDir, scsiCtx->lastCommandSenseData, scsiCtx->senseDataSize, 15);
+    os_Update_File_System_Cache(scsiCtx);
+    os_Unlock_Device(scsiCtx);
 
+    PrintDataBuffer(scsiCtx->lastCommandSenseData, scsiCtx->senseDataSize);
     return result;
 }
 
 
-
-BOOL NvmeUtil::win10FW_GetfwdlInfoQuery(HANDLE hHandle,PSTORAGE_HW_FIRMWARE_INFO fwdlInfo,  BOOL isNvme)
-{
+BOOL NvmeUtil::win10FW_GetfwdlInfoQuery(HANDLE hHandle,PSTORAGE_HW_FIRMWARE_INFO fwdlInfo,  BOOL isNvme, PBYTE pFwupdateSlotId) {
     BOOL ret = FALSE;
-
     STORAGE_HW_FIRMWARE_INFO_QUERY fwdlInfoQuery;
     memset(&fwdlInfoQuery, 0, sizeof(STORAGE_HW_FIRMWARE_INFO_QUERY));
     fwdlInfoQuery.Version = sizeof(STORAGE_HW_FIRMWARE_INFO_QUERY);
@@ -916,6 +1310,7 @@ BOOL NvmeUtil::win10FW_GetfwdlInfoQuery(HANDLE hHandle,PSTORAGE_HW_FIRMWARE_INFO
     uint8_t *outputData = C_CAST(uint8_t*, malloc(outputDataSize));
     if (!outputData)
     {
+        printf("Allocate buffer for read firmware info failed. Error code: %d\n", GetLastError());
         return FALSE;
     }
     memset(outputData, 0, outputDataSize);
@@ -947,14 +1342,30 @@ BOOL NvmeUtil::win10FW_GetfwdlInfoQuery(HANDLE hHandle,PSTORAGE_HW_FIRMWARE_INFO
         printf("\tSlot Count: %d\n", fwdlSupportedInfo->SlotCount);
         printf("\tFirmware Shared: %d\n", fwdlSupportedInfo->FirmwareShared);
         //print out what's in the slots!
-        for (uint8_t iter = 0; iter < fwdlSupportedInfo->SlotCount && iter < slotCount; ++iter)
-        {
+        for (uint8_t iter = 0; iter < fwdlSupportedInfo->SlotCount && iter < slotCount; ++iter) {
             printf("\t    Firmware Slot %d:\n", fwdlSupportedInfo->Slot[iter].SlotNumber);
             printf("\t\tRead Only: %d\n", fwdlSupportedInfo->Slot[iter].ReadOnly);
             printf("\t\tRevision: %s\n", fwdlSupportedInfo->Slot[iter].Revision);
         }
-        memcpy(fwdlInfo, fwdlSupportedInfo, sizeof(STORAGE_HW_FIRMWARE_INFO));
-        ret = TRUE;
+
+        *pFwupdateSlotId = 255;
+        // Search first slot for updating firmware
+        for (uint8_t iter = 0; iter < fwdlSupportedInfo->SlotCount && iter < slotCount; ++iter) {
+            if (fwdlSupportedInfo->Slot[iter].ReadOnly == 0) {
+                *pFwupdateSlotId = fwdlSupportedInfo->Slot[iter].SlotNumber;
+                break;
+            }
+        }
+
+        // if no valid slot
+        if (*pFwupdateSlotId == 255) {
+            printf("Novalid slot to do firmware update\n");
+            ret = FALSE;
+        } else {
+            printf("Slot to do firmware update is %d\n", *pFwupdateSlotId);
+            memcpy(fwdlInfo, fwdlSupportedInfo, sizeof(STORAGE_HW_FIRMWARE_INFO));
+            ret = TRUE;
+        }
     }
     else
     {
@@ -962,7 +1373,7 @@ BOOL NvmeUtil::win10FW_GetfwdlInfoQuery(HANDLE hHandle,PSTORAGE_HW_FIRMWARE_INFO
         ret = FALSE;
     }
     safe_Free(outputData)
-        return ret;
+    return ret;
 }
 
 
@@ -1214,3 +1625,63 @@ BOOL NvmeUtil::win10FW_Active(HANDLE hHandle, PSTORAGE_HW_FIRMWARE_INFO fwdlInfo
     return TRUE;
 }
 
+
+BOOL NvmeUtil::Deallocate(HANDLE hHandle) {
+    BOOL ret = FALSE;
+    PVOID buffer = NULL;
+    ULONG bufferLength = 0;
+    ULONG returnedLength = 0;
+
+    PDEVICE_MANAGE_DATA_SET_ATTRIBUTES pAttr = NULL;
+    PDEVICE_DSM_RANGE pRange = NULL;
+
+    // Allocate buffer for use.
+    bufferLength =
+        sizeof(DEVICE_MANAGE_DATA_SET_ATTRIBUTES) + sizeof(DEVICE_DSM_RANGE);
+    buffer = malloc(bufferLength);
+
+    if (buffer == NULL) {
+        printf("Deallocate: allocate buffer failed.\n");
+        return FALSE;
+    }
+
+    // see also
+    // https://docs.microsoft.com/ja-jp/windows/desktop/api/winioctl/ni-winioctl-ioctl_storage_manage_data_set_attributes
+    // see also winioctl.h
+    // https://github.com/RetroSoftwareRepository/FreeNT-0.4.8/blob/ed4eb9c7c337a19783f58a919da2efc1e26b0d85/drivers/filesystems/btrfs/balance.c#L2871
+    ZeroMemory(buffer, bufferLength);
+    pAttr = (PDEVICE_MANAGE_DATA_SET_ATTRIBUTES)buffer;
+
+    pAttr->Action = DeviceDsmAction_Trim;
+    pAttr->Flags =
+        DEVICE_DSM_FLAG_TRIM_NOT_FS_ALLOCATED;  // for native deallocate (not
+        // file-level trimming)
+    pAttr->ParameterBlockOffset =
+        0;  // TRIM does not need additional parameters
+    pAttr->ParameterBlockLength = 0;
+    pAttr->DataSetRangesOffset = sizeof(DEVICE_MANAGE_DATA_SET_ATTRIBUTES);
+    pAttr->DataSetRangesLength = sizeof(DEVICE_DSM_RANGE);  //  only one range
+
+    pRange = (PDEVICE_DSM_RANGE)((ULONGLONG)pAttr +
+                                  sizeof(DEVICE_MANAGE_DATA_SET_ATTRIBUTES));
+    pRange->StartingOffset = 0;   // LBA = 0
+    pRange->LengthInBytes = 512;  // 1 sector
+
+    // Send request down (through WinFunc.cpp)
+    ret = DeviceIoControl(
+        hHandle,  // (HANDLE) hDevice             // handle to device
+        IOCTL_STORAGE_MANAGE_DATA_SET_ATTRIBUTES,  // dwIoControlCode
+        buffer,           // (LPVOID) lpInBuffer          // input buffer
+        bufferLength,     // (DWORD) nInBufferSize        // size of the input
+        // buffer
+        buffer,           // (LPVOID) lpOutBuffer         // output buffer
+        bufferLength,     // (DWORD) nOutBufferSize       // size of the output
+        // buffer
+        &returnedLength,  // (LPDWORD) lpBytesReturned    // number of bytes
+        // returned
+        NULL);  // (LPOVERLAPPED) lpOverlapped  // OVERLAPPED structure
+
+    free(buffer);
+
+    return ret;
+}
