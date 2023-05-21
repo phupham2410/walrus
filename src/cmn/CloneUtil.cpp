@@ -320,7 +320,6 @@ eRetCode DiskCloneUtil::GenCreatePartScript(const sDcDriveInfo& di, std::string&
 }
 
 static string GenScriptFileName() {
-    return "dmm_scr.txt";
     return string(tmpnam(NULL));
 }
 
@@ -354,26 +353,22 @@ eRetCode DiskCloneUtil::ExecScript(std::string& script) {
     // Start child process
     // Execute diskpart /s script
 
-    // string lname = "D:/Working/hiptec/walrus/run/dp_log.txt";
-    string lname = "dmm_log.txt";
-
-    string fname = "./" + GenScriptFileName();
-    if (DBGMODE) cout << "ScriptFile: " << fname << endl;
-
+    string base = GenScriptFileName();
+    string lname = "./" + base + ".log";
+    string fname = "./" + base + ".scr";
     ofstream fstr; fstr.open (fname);
     fstr << script << endl; fstr.close();
-
-    stringstream cstr;
-    cstr << "diskpart /s " << fname << " > " << lname;
-
+    stringstream cstr; cstr << "diskpart /s " << fname;
+    if (lname.length()) cstr << " > " << lname;
     string cmd = cstr.str();
-    if (DBGMODE) cout << "Executing command " << cmd << endl;
+
+    if (DBGMODE) {
+        cout << "Script: " << fname << "; " << "Command: " << cmd << endl;
+    }
 
     ExecCommand(cmd);
-    // WinExec(cmd.c_str(), SW_HIDE);
-    // system(cmd.c_str());
 
-    // remove(fname.c_str()); remove(lname.c_str());
+    remove(fname.c_str()); remove(lname.c_str());
     return RET_OK;
 }
 
