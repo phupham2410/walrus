@@ -10,8 +10,10 @@ using namespace StorageApi;
 using namespace DiskCloneUtil;
 
 #include <cstdio>
+#include <string.h>
 #include <diskguid.h>
 #include <ntdddisk.h>
+#include <processthreadsapi.h>
 
 #define DBGMODE 1
 
@@ -322,27 +324,29 @@ static string GenScriptFileName() {
     return string(tmpnam(NULL));
 }
 
-#include <string.h>
-#include <processthreadsapi.h>
+static eRetCode ExecCommand(const string& dpcmd) {
+    char cmdline[ MAX_PATH];
+    sprintf( cmdline, "cmd.exe /c %s", dpcmd.c_str());
 
-static eRetCode ExecCommand(const string& cmd) {
-    STARTUPINFOA si;
-    PROCESS_INFORMATION pi;
-    LPSTR cmdline, program;
-    memset(&si, 0, sizeof(si));
-    memset(&pi, 0, sizeof(pi));
+    PROCESS_INFORMATION pi; memset( &pi, 0, sizeof(pi));
+    STARTUPINFOA si; memset( &si, 0, sizeof(si)); si.cb = sizeof(si);
 
-    si.cb = sizeof(si);
+    DWORD err = 0; BOOL ret;
+    ret = CreateProcessA( NULL, cmdline, NULL, NULL, FALSE,
+        NORMAL_PRIORITY_CLASS | CREATE_NO_WINDOW, NULL, NULL, &si, &pi );
 
-    cmdline = strdup(cmd.c_str());
-    program = "cmd"; strdup(cmd.c_str());
-
-    if (CreateProcessA(program, cmdline, NULL, NULL, 0, 0, NULL, NULL, &si, &pi))
-    {
-        WaitForSingleObject(pi.hProcess, INFINITE);
-        CloseHandle(pi.hProcess);
-        CloseHandle(pi.hThread);
+    if (!ret) err = GetLastError();
+    else {
+        WaitForSingleObject( pi.hProcess, INFINITE );
+        GetExitCodeProcess( pi.hProcess, &err );
+        CloseHandle( pi.hProcess );
     }
+
+    if (DBGMODE) {
+        if( err )
+            cout << "Execute command fail. Error " << err << endl;
+    }
+
     return RET_OK;
 }
 
@@ -365,9 +369,9 @@ eRetCode DiskCloneUtil::ExecScript(std::string& script) {
     string cmd = cstr.str();
     if (DBGMODE) cout << "Executing command " << cmd << endl;
 
-    // ExecCommand(cmd);
+    ExecCommand(cmd);
     // WinExec(cmd.c_str(), SW_HIDE);
-    system(cmd.c_str());
+    // system(cmd.c_str());
 
     // remove(fname.c_str()); remove(lname.c_str());
     return RET_OK;
@@ -535,7 +539,6 @@ eRetCode DiskCloneUtil::HandleCloneDrive(
     if (p && !p->workload) {
         INIT_PROGRESS(p, 0); FINALIZE_PROGRESS(p, RET_FAIL);
     }
-
     return RET_FAIL;
 }
 
