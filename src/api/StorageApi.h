@@ -72,11 +72,21 @@ namespace StorageApi {
     typedef std::vector<tPartAddr> tAddrArray;  // List of partition's position
     typedef const tAddrArray tConstAddrArray;   // Constant vector
 
+    struct sExtInfo {
+        bool valid;  // Valid data partition
+        char letter; // drive letter C/D/E/F ..
+        WSTR name;   // drive name "My Data"
+        U64 cap;     //
+        U64 usedsize;// used space in bytes
+        U64 freesize;// free space in bytes
+    };
+
     struct sPartition {
         WSTR name;            // Partition name
         U32 index;            // Partition index
         U64 cap;              // Capacity in sector
         tPartAddr addr;       // Partition address (start lba, sector count)
+        sExtInfo fsinfo;
 
         void reset();
         sPartition();

@@ -1,4 +1,5 @@
 #include<stdlib.h>
+#include "SysHeader.h"
 #include "NvmeUtil.h"
 
 using namespace std;
@@ -427,7 +428,7 @@ BOOL NvmeUtil::win10FW_TransferFile(HANDLE hHandle, PSTORAGE_HW_FIRMWARE_INFO fw
     moreToDownload = TRUE;
 
 
-    fileHandle = CreateFile(fwFileName,   // file to open
+    fileHandle = CreateFileA(fwFileName,   // file to open
                             GENERIC_READ,          // open for reading
                             FILE_SHARE_READ,       // share for reading
                             NULL,                  // default security
@@ -658,62 +659,62 @@ BOOL NvmeUtil::GetSelfTestLog(HANDLE hdl, PNVME_DEVICE_SELF_TEST_LOG stl) {
 }
 
 
-BOOL NvmeUtil::DeviceSelfTest(HANDLE hdl, eSelfTestCode testcode) {
-    BOOL  result = FALSE;
-    PVOID buffer = NULL;
-    ULONG bufferLength = 0;
-    ULONG returnedLength = 0;
-
-    STORAGE_PROTOCOL_COMMAND* pCmd = NULL;
-    PNVME_COMMAND pNvmeCmd;
-
-    // Allocate buffer for use.
-    bufferLength = offsetof(STORAGE_PROTOCOL_COMMAND, Command) +
-                   STORAGE_PROTOCOL_COMMAND_LENGTH_NVME;
-    buffer = malloc(bufferLength);
-
-    if (buffer == NULL) {
-        printf("DeviceSelfTest: allocate buffer failed.\n");
-        goto exit;
-    }
-
-
-    ZeroMemory(buffer, bufferLength);
-    pCmd = (STORAGE_PROTOCOL_COMMAND*)buffer;
-
-    pCmd->Length = sizeof(STORAGE_PROTOCOL_COMMAND);
-    pCmd->Version = STORAGE_PROTOCOL_STRUCTURE_VERSION;
-    pCmd->ProtocolType = ProtocolTypeNvme;
-    pCmd->Flags = STORAGE_PROTOCOL_COMMAND_FLAG_ADAPTER_REQUEST;
-    pCmd->CommandLength = STORAGE_PROTOCOL_COMMAND_LENGTH_NVME;
-    pCmd->ErrorInfoLength = 0;
-    pCmd->ErrorInfoOffset = 0;
-    pCmd->DataFromDeviceBufferOffset = 0;
-    pCmd->DataFromDeviceTransferLength = 0;
-    pCmd->TimeOutValue = 15; // In seconds
-    pCmd->CommandSpecific = STORAGE_PROTOCOL_SPECIFIC_NVME_ADMIN_COMMAND;
-
-    pNvmeCmd = (PNVME_COMMAND)pCmd->Command;
-    pNvmeCmd->CDW0.OPC = NVME_ADMIN_COMMAND_DEVICE_SELF_TEST;
-    pNvmeCmd->NSID = NVME_NAMESPACE_ALL;
-    pNvmeCmd->u.GENERAL.CDW10 = testcode;
-
-    // Send request down.
-    result = DeviceIoControl(hdl,
-                             IOCTL_STORAGE_PROTOCOL_COMMAND,
-                             buffer,
-                             bufferLength,
-                             buffer,
-                             bufferLength,
-                             &returnedLength,
-                             NULL
-                             );
-
-exit:
-    if (buffer != NULL) {
-        free(buffer);
-    }
-
-    return result;
-}
+// BOOL NvmeUtil::DeviceSelfTest(HANDLE hdl, eSelfTestCode testcode) {
+//     BOOL  result = FALSE;
+//     PVOID buffer = NULL;
+//     ULONG bufferLength = 0;
+//     ULONG returnedLength = 0;
+//
+//     STORAGE_PROTOCOL_COMMAND* pCmd = NULL;
+//     PNVME_COMMAND pNvmeCmd;
+//
+//     // Allocate buffer for use.
+//     bufferLength = offsetof(STORAGE_PROTOCOL_COMMAND, Command) +
+//                    STORAGE_PROTOCOL_COMMAND_LENGTH_NVME;
+//     buffer = malloc(bufferLength);
+//
+//     if (buffer == NULL) {
+//         printf("DeviceSelfTest: allocate buffer failed.\n");
+//         goto exit;
+//     }
+//
+//
+//     ZeroMemory(buffer, bufferLength);
+//     pCmd = (STORAGE_PROTOCOL_COMMAND*)buffer;
+//
+//     pCmd->Length = sizeof(STORAGE_PROTOCOL_COMMAND);
+//     pCmd->Version = STORAGE_PROTOCOL_STRUCTURE_VERSION;
+//     pCmd->ProtocolType = ProtocolTypeNvme;
+//     pCmd->Flags = STORAGE_PROTOCOL_COMMAND_FLAG_ADAPTER_REQUEST;
+//     pCmd->CommandLength = STORAGE_PROTOCOL_COMMAND_LENGTH_NVME;
+//     pCmd->ErrorInfoLength = 0;
+//     pCmd->ErrorInfoOffset = 0;
+//     pCmd->DataFromDeviceBufferOffset = 0;
+//     pCmd->DataFromDeviceTransferLength = 0;
+//     pCmd->TimeOutValue = 15; // In seconds
+//     pCmd->CommandSpecific = STORAGE_PROTOCOL_SPECIFIC_NVME_ADMIN_COMMAND;
+//
+//     pNvmeCmd = (PNVME_COMMAND)pCmd->Command;
+//     pNvmeCmd->CDW0.OPC = NVME_ADMIN_COMMAND_DEVICE_SELF_TEST;
+//     pNvmeCmd->NSID = NVME_NAMESPACE_ALL;
+//     pNvmeCmd->u.GENERAL.CDW10 = testcode;
+//
+//     // Send request down.
+//     result = DeviceIoControl(hdl,
+//                              IOCTL_STORAGE_PROTOCOL_COMMAND,
+//                              buffer,
+//                              bufferLength,
+//                              buffer,
+//                              bufferLength,
+//                              &returnedLength,
+//                              NULL
+//                              );
+//
+// exit:
+//     if (buffer != NULL) {
+//         free(buffer);
+//     }
+//
+//     return result;
+// }
 
