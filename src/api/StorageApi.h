@@ -76,6 +76,7 @@ namespace StorageApi {
         bool valid;  // Valid data partition
         char letter; // drive letter C/D/E/F ..
         WSTR name;   // drive name "My Data"
+        WSTR fsname; // file system name NTFS
         U64 cap;     //
         U64 usedsize;// used space in bytes
         U64 freesize;// free space in bytes
@@ -85,8 +86,8 @@ namespace StorageApi {
         WSTR name;            // Partition name
         U32 index;            // Partition index
         U64 cap;              // Capacity in sector
-        tPartAddr addr;       // Partition address (start lba, sector count)
-        sExtInfo fsinfo;
+        tPartAddr addr;       // Partition address
+        sExtInfo fsinfo;      // FileSystem info on this partition
 
         void reset();
         sPartition();
