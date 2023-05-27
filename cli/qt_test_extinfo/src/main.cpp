@@ -157,6 +157,13 @@ struct sVolDiskExtInfo {
     vector<sDiskExtInfo> di;
 };
 
+eRetCode GetDriveIndex(const std::string& name, U32& index) {
+    const char* p = name.c_str();
+    while(*p && !INRANGE('0', '9' + 1, *p)) p++;
+    if (!*p) return RET_INVALID_ARG;
+    sscanf(p, "%d", &index); return RET_OK;
+}
+
 // vollist format: "C:\, D:\, E:\"
 eRetCode UtilScanVolList(vector<string>& vollist) {
     vollist.clear();
@@ -319,13 +326,6 @@ void UtilUpdatePartInfo(const vector<sVolDiskExtInfo>& va, U32 drvidx, sPartInfo
     }
 }
 
-eRetCode GetDriveIndex(const std::string& name, U32& index) {
-    const char* p = name.c_str();
-    while(*p && !INRANGE('0', '9' + 1, *p)) p++;
-    if (!*p) return RET_INVALID_ARG;
-    sscanf(p, "%d", &index); return RET_OK;
-}
-
 void Test_UtilScanVolumeInfo() {
     tVolArray va;
     UtilScanVolumeInfo(va);
@@ -390,12 +390,17 @@ void Test_ScanPartitionExt()  {
     }
 }
 
+#include "FsUtil.h"
+void Test_FsUtil() {
+    FsUtil::TestUpdateVolumeInfo();
+}
+
 int main(int argc, char** argv) {
     (void) argc; (void) argv;
 
     // Util_GetVolumeList();
     // Test_UtilScanVolumeInfo();
-    Test_ScanPartitionExt();
+    Test_FsUtil();
 
     return 0;
 }
