@@ -8,6 +8,7 @@
 
 #include "ApiUtil.h"
 #include "DeviceMgr.h"
+#include "FsUtil.h"
 
 #include "StorageApiCmn.h"
 
@@ -107,6 +108,8 @@ eRetCode StorageApi::ScanDrive(tDriveArray &darr, bool rid, bool rsm, volatile s
 
         darr.push_back(di); DeviceMgr::CloseDevice(phy);
     }
+
+    FsUtil::UpdateVolumeInfo(darr);
 
     if (!darr.size())
         rc = (vldcnt != 0) ? RET_SKIP_DRIVE : RET_NO_PERMISSION;

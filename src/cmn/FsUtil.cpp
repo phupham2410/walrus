@@ -181,9 +181,8 @@ static void UtilUpdatePartInfo(const tVolArray& va, U32 drvidx, sPartInfo& pi) {
     }
 }
 
-eRetCode FsUtil::HandleUpdateVolumeInfo(tDriveArray& da) {
+eRetCode FsUtil::UpdateVolumeInfo(tDriveArray& da) {
     tVolArray va; UtilScanVolumeInfo(va);
-
     for(auto& d:da) {
         U32 drvidx;
         GetDriveIndex(d.name, drvidx);
@@ -194,7 +193,7 @@ eRetCode FsUtil::HandleUpdateVolumeInfo(tDriveArray& da) {
 
 eRetCode FsUtil::TestUpdateVolumeInfo() {
     tDriveArray da; ScanDrive(da);
-    HandleUpdateVolumeInfo(da);
+    UpdateVolumeInfo(da);
 
     #define DUMP(t, w, v) wcout << t << "(" << setw(w) << (v) << ") "
 

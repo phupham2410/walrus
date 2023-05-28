@@ -11,8 +11,7 @@
 
 namespace FsUtil { // FileSystem Util
     // Called from StorageApi
-    StorageApi::eRetCode HandleUpdateVolumeInfo(StorageApi::tDriveArray& da);
-
+    StorageApi::eRetCode UpdateVolumeInfo(StorageApi::tDriveArray& da);
     StorageApi::eRetCode TestUpdateVolumeInfo();
 }
 
