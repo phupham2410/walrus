@@ -482,6 +482,21 @@ typedef struct _tScsiContext {
     tScsiStatus     returnStatus;
 } tScsiContext;
 
+
+typedef enum _eSanitizeStatus
+{
+    SANITIZE_STATUS_SUCCESS = 0,//device reports that the last sanitize completed without error.
+    SANITIZE_STATUS_NOT_IN_PROGRESS,//SCSI/SAS - May be the same thing as success, which is why they share the same value.
+    SANITIZE_STATUS_IN_PROGRESS,
+    SANITIZE_STATUS_NEVER_SANITIZED,//Only useful on a fresh drive that's never been sanitized. Some amount of support to detect this on ATA is also present.
+    SANITIZE_STATUS_FAILED,//generic failure
+    SANITIZE_STATUS_FAILED_PHYSICAL_SECTORS_REMAIN,//ATA - Completed with physical sectors that are available to be allocated for user data that were not successfully sanitized
+    SANITIZE_STATUS_UNSUPPORTED_FEATURE,//ATA - the specified sanitize value in the feature register is not supported
+    SANITIZE_STATUS_FROZEN,//ATA specific. In sanitize frozen state
+    SANITIZE_STATUS_FREEZELOCK_FAILED_DUE_TO_ANTI_FREEZE_LOCK,
+    SANITIZE_STATUS_UNKNOWN, //Will likely be considered a failure.
+}eSanitizeStatus;
+
 /* ======================== Public Classes ======================== */
 class NvmeUtil
 {
@@ -509,6 +524,8 @@ public:
     static BOOL win10FW_Active(HANDLE hHandle, PSTORAGE_HW_FIRMWARE_INFO fwdlInfo, BYTE slotId);
 
     static BOOL Deallocate(HANDLE hHandle);
+    static BOOL GetSanitizeStatusLog(HANDLE hDevice, uint8_t sanitizeStatusLog[512]);
+    static BOOL GetNVMESanitizeProgress(HANDLE hHandle, double *percentComplete, eSanitizeStatus *sanitizeStatus);
 };
 
 #endif // NvmeUtil_H

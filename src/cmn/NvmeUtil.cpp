@@ -5,7 +5,9 @@
 #include <ntddscsi.h>
 #include<winerror.h>
 #include <tchar.h>
+#include<nvme.h>
 using namespace std;
+
 
 static void PrintDataBuffer(PUCHAR DataBuffer, ULONG BufferLength)
 {
@@ -319,6 +321,7 @@ BOOL NvmeUtil::GetHealthInfoLog(HANDLE hDevice, PNVME_HEALTH_INFO_LOG pHealthInf
 }
 
 
+
 BOOL NvmeUtil::GetSelfTestLog(HANDLE hDevice, PNVME_DEVICE_SELF_TEST_LOG pSelfTestLog) {
     BOOL    result = FALSE;
     PVOID   buffer = NULL;
@@ -336,8 +339,8 @@ BOOL NvmeUtil::GetSelfTestLog(HANDLE hDevice, PNVME_DEVICE_SELF_TEST_LOG pSelfTe
 
     // Allocate buffer for use.
     bufferLength = offsetof(STORAGE_PROPERTY_QUERY, AdditionalParameters)
-        + sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA)
-        + sizeof(NVME_DEVICE_SELF_TEST_LOG);
+                   + sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA)
+                   + sizeof(NVME_DEVICE_SELF_TEST_LOG);
     buffer = malloc(bufferLength);
 
     if (buffer == NULL) {
@@ -361,16 +364,16 @@ BOOL NvmeUtil::GetSelfTestLog(HANDLE hDevice, PNVME_DEVICE_SELF_TEST_LOG pSelfTe
     protocolData->ProtocolDataOffset = sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA);
     protocolData->ProtocolDataLength = sizeof(NVME_DEVICE_SELF_TEST_LOG);
 
-    // Send request down.  
+    // Send request down.
     result = DeviceIoControl(hDevice,
-        IOCTL_STORAGE_QUERY_PROPERTY,
-        buffer,
-        bufferLength,
-        buffer,
-        bufferLength,
-        &returnedLength,
-        NULL
-    );
+                             IOCTL_STORAGE_QUERY_PROPERTY,
+                             buffer,
+                             bufferLength,
+                             buffer,
+                             bufferLength,
+                             &returnedLength,
+                             NULL
+                             );
 
     if (!result) goto exit;
 
@@ -1014,8 +1017,8 @@ static BOOL scsiSendCdb(tScsiContext *scsiCtx, uint8_t *cdb, eCDBLen cdbLen, uin
     scsiCtx->dataLength = dataLen;
     if (scsiCtx->srbType == SRB_TYPE_STORAGE_REQUEST_BLOCK) {
         std::cout << "Try sendSCSIPassThrough_EX\n";
-         ret = sendSCSIPassThrough(scsiCtx);
-       // ret = sendSCSIPassThrough_EX(scsiCtx);
+        //ret = sendSCSIPassThrough(scsiCtx);
+        ret = scsiCtx_Direct(scsiCtx);
     } else {
         ret = sendSCSIPassThrough(scsiCtx);
     }
@@ -1634,14 +1637,20 @@ BOOL NvmeUtil::Deallocate(HANDLE hHandle) {
 
     PDEVICE_MANAGE_DATA_SET_ATTRIBUTES pAttr = NULL;
     PDEVICE_DSM_RANGE pRange = NULL;
+    tScsiContext scsiContext;
+    scsiContext.hDevice = hHandle;
+    os_Lock_Device(&scsiContext);
+    os_Unmount_File_Systems_On_Device(&scsiContext);
+
 
     // Allocate buffer for use.
     bufferLength =
-        sizeof(DEVICE_MANAGE_DATA_SET_ATTRIBUTES) + sizeof(DEVICE_DSM_RANGE);
+        sizeof(DEVICE_MANAGE_DATA_SET_ATTRIBUTES);
     buffer = malloc(bufferLength);
 
     if (buffer == NULL) {
         printf("Deallocate: allocate buffer failed.\n");
+         os_Unlock_Device(&scsiContext);
         return FALSE;
     }
 
@@ -1654,19 +1663,18 @@ BOOL NvmeUtil::Deallocate(HANDLE hHandle) {
 
     pAttr->Action = DeviceDsmAction_Trim;
     pAttr->Flags =
-        DEVICE_DSM_FLAG_TRIM_NOT_FS_ALLOCATED;  // for native deallocate (not
-        // file-level trimming)
+        DEVICE_DSM_FLAG_ENTIRE_DATA_SET_RANGE | DEVICE_DSM_FLAG_TRIM_NOT_FS_ALLOCATED;
     pAttr->ParameterBlockOffset =
         0;  // TRIM does not need additional parameters
     pAttr->ParameterBlockLength = 0;
-    pAttr->DataSetRangesOffset = sizeof(DEVICE_MANAGE_DATA_SET_ATTRIBUTES);
-    pAttr->DataSetRangesLength = sizeof(DEVICE_DSM_RANGE);  //  only one range
-
+    pAttr->DataSetRangesOffset = 0;
+        pAttr->DataSetRangesLength = 0;
+#if 0
     pRange = (PDEVICE_DSM_RANGE)((ULONGLONG)pAttr +
                                   sizeof(DEVICE_MANAGE_DATA_SET_ATTRIBUTES));
     pRange->StartingOffset = 0;   // LBA = 0
     pRange->LengthInBytes = 512;  // 1 sector
-
+#endif
     // Send request down (through WinFunc.cpp)
     ret = DeviceIoControl(
         hHandle,  // (HANDLE) hDevice             // handle to device
@@ -1682,6 +1690,137 @@ BOOL NvmeUtil::Deallocate(HANDLE hHandle) {
         NULL);  // (LPOVERLAPPED) lpOverlapped  // OVERLAPPED structure
 
     free(buffer);
-
+ os_Unlock_Device(&scsiContext);
+    os_Update_File_System_Cache(&scsiContext);
     return ret;
+}
+
+
+BOOL NvmeUtil::GetSanitizeStatusLog(HANDLE hDevice, uint8_t sanitizeStatusLog[512]) {
+    BOOL    result = FALSE;
+    PVOID   buffer = NULL;
+    ULONG   bufferLength = 0;
+    ULONG   returnedLength = 0;
+
+    PSTORAGE_PROPERTY_QUERY query = NULL;
+    PSTORAGE_PROTOCOL_SPECIFIC_DATA protocolData = NULL;
+    PSTORAGE_PROTOCOL_DATA_DESCRIPTOR protocolDataDescr = NULL;
+
+
+    // Allocate buffer for use.
+    bufferLength = offsetof(STORAGE_PROPERTY_QUERY, AdditionalParameters)
+                   + sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA)
+                   + sizeof(sanitizeStatusLog);
+    buffer = malloc(bufferLength);
+
+    if (buffer == NULL) {
+        printf("GetSanitizeStatusLog: allocate buffer failed.\n");
+        goto exit;
+    }
+
+    ZeroMemory(buffer, bufferLength);
+
+    query = (PSTORAGE_PROPERTY_QUERY)buffer;
+    protocolDataDescr = (PSTORAGE_PROTOCOL_DATA_DESCRIPTOR)buffer;
+    protocolData = (PSTORAGE_PROTOCOL_SPECIFIC_DATA)query->AdditionalParameters;
+
+    query->PropertyId = StorageDeviceProtocolSpecificProperty;
+    query->QueryType = PropertyStandardQuery;
+
+    protocolData->ProtocolType = ProtocolTypeNvme;
+    protocolData->DataType = NVMeDataTypeLogPage;
+    protocolData->ProtocolDataRequestValue = NVME_LOG_PAGE_SANITIZE_STATUS;
+    protocolData->ProtocolDataRequestSubValue = NVME_NAMESPACE_ALL;
+    protocolData->ProtocolDataOffset = sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA);
+    protocolData->ProtocolDataLength = sizeof(sanitizeStatusLog);
+
+    // Send request down.
+    result = DeviceIoControl(hDevice,
+                             IOCTL_STORAGE_QUERY_PROPERTY,
+                             buffer,
+                             bufferLength,
+                             buffer,
+                             bufferLength,
+                             &returnedLength,
+                             NULL
+                             );
+
+    if (!result) goto exit;
+
+    // Validate the returned data.
+    if ((protocolDataDescr->Version != sizeof(STORAGE_PROTOCOL_DATA_DESCRIPTOR)) ||
+        (protocolDataDescr->Size != sizeof(STORAGE_PROTOCOL_DATA_DESCRIPTOR))) {
+        printf("GetSanitizeStatusLog: Data Descriptor Header is not valid.\n");
+        result = FALSE;
+        goto exit;
+    }
+
+    protocolData = &protocolDataDescr->ProtocolSpecificData;
+
+    if ((protocolData->ProtocolDataOffset < sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA)) ||
+        (protocolData->ProtocolDataLength < sizeof(NVME_DEVICE_SELF_TEST_LOG))) {
+        printf("GetSanitizeStatusLog: ProtocolData Offset/Length is not valid.\n");
+        result = FALSE;
+        goto exit;
+    }
+
+    memcpy(sanitizeStatusLog, (PCHAR)protocolData + protocolData->ProtocolDataOffset, sizeof(sanitizeStatusLog));
+
+    result = TRUE;
+exit:
+    if (buffer != NULL)
+    {
+        free(buffer);
+    }
+
+    return result;
+}
+#define M_GETBITRANGE(input, msb, lsb) (((input) >> (lsb)) & ~(~UINT64_C(0) << ((msb) - (lsb) + 1)))
+
+// Big endian parameter order, little endian value
+    #define M_BytesTo2ByteValue(b1, b0)                            (        \
+    static_cast<uint16_t> (  (static_cast<uint16_t>(b1) << 8) | (static_cast<uint16_t>(b0) <<  0)  )          \
+                                                                   )
+
+BOOL NvmeUtil::GetNVMESanitizeProgress(HANDLE hHandle, double *percentComplete, eSanitizeStatus *sanitizeStatus)
+{
+    BOOL result = TRUE;
+    //read the sanitize status log
+    uint8_t sanitizeStatusLog[512] = { 0 };
+
+
+    //TODO: Set namespace ID?
+    if (NvmeUtil::GetSanitizeStatusLog(hHandle, sanitizeStatusLog))
+    {
+
+        uint16_t sprog = M_BytesTo2ByteValue(sanitizeStatusLog[1], sanitizeStatusLog[0]);
+        uint16_t sstat = M_BytesTo2ByteValue(sanitizeStatusLog[3], sanitizeStatusLog[2]);
+        *percentComplete = sprog;
+
+        switch(M_GETBITRANGE(sstat, 2, 0))
+        {
+        case 0:
+            *sanitizeStatus = SANITIZE_STATUS_NEVER_SANITIZED;
+            break;
+        case 1:
+            *sanitizeStatus = SANITIZE_STATUS_SUCCESS;
+            break;
+        case 2:
+            *sanitizeStatus = SANITIZE_STATUS_IN_PROGRESS;
+            break;
+        case 3:
+            *sanitizeStatus = SANITIZE_STATUS_FAILED;
+            break;
+        default:
+            *sanitizeStatus = SANITIZE_STATUS_UNKNOWN;
+            break;
+        }
+    }
+    else
+    {
+        result = FALSE;
+    }
+    *percentComplete *= 100.0;
+    *percentComplete /= 65536.0;
+    return result;
 }

@@ -1,6 +1,6 @@
 #include "SystemUtil.h"
 #include "windows.h"
-#include "shlobj.h"
+#include <shlobj_core.h>
 
 bool SystemUtil::IsAdminMode()
 {
