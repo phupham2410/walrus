@@ -186,7 +186,7 @@ eRetCode StorageApi::CloneDrive(CSTR &dstdrv, CSTR &srcdrv, tConstAddrArray &par
 
     // return ProcessTask(p, 3, RET_NOT_IMPLEMENT);
 
-    return DiskCloneUtil::HandleCloneDrive(dstdrv, srcdrv, parr, p);
+    return DiskCloneUtil::HandleCloneDrive_RawCopy(dstdrv, srcdrv, parr, p);
 }
 
 // --------------------------------------------------------------------------------

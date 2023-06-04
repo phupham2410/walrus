@@ -1,11 +1,13 @@
 
 #include "CloneUtil.h"
 #include "CoreUtil.h"
+#include "FsUtil.h"
 
 #include <windows.h>
 #include "winioctl.h"
 
 using namespace std;
+using namespace FsUtil;
 using namespace StorageApi;
 using namespace DiskCloneUtil;
 
@@ -143,9 +145,42 @@ static bool ToGptPartIdString(U32 t, string& id) {
     return true;
 }
 
+static void UpdateLinks(sDcVolInfo& vi) {
+    char buffer[256]; string tmp = "hk1j2kjhkds";
+    sprintf(buffer, "%c:\\shalink_%s", vi.letter, tmp.c_str());
+    vi.shalink = string(buffer);
+    sprintf(buffer, "%c:\\mntlink_%s", vi.letter, tmp.c_str());
+    vi.mntlink = string(buffer);
+}
+
+static void UpdateVolInfo(const tVolArray& va, U32 drvidx, sDcPartInfo& pi) {
+    U64 minpos = pi.start, maxpos = minpos + pi.psize;
+    sDcVolInfo& vi = pi.vi;
+    U32 volcount = 0;
+
+    set<char> charset;
+
+    // search for volumes in this partition on drive drvidx
+    for (auto& v : va) {
+        charset.insert(v.letter);
+        for (auto& d : v.di) {
+            if (d.drvidx != drvidx) continue;
+            if (d.offset < minpos) continue;
+            if ((d.offset + d.length) > maxpos) continue;
+
+            // the volume is located in this partition
+            vi.letter = v.letter; UpdateLinks(vi);
+            volcount++; continue;
+        }
+    }
+    vi.valid = (volcount == 1);
+}
+
 eRetCode DiskCloneUtil::GetDriveInfo(U32 srcidx, sDcDriveInfo& si) {
     HDL hdl;
     if (RET_OK != UtilOpenFile(srcidx, hdl)) return RET_INVALID_ARG;
+
+    tVolArray va; ScanVolumeInfo(va);
 
     // Read DriveLayout and Partitions
     // Fill in si
@@ -170,6 +205,7 @@ eRetCode DiskCloneUtil::GetDriveInfo(U32 srcidx, sDcDriveInfo& si) {
         if (!p.PartitionNumber) continue;
         sDcPartInfo dpi;
         ConvertPartInfo(p, dpi);
+        UpdateVolInfo(va, srcidx, dpi);
         si.parr.push_back(dpi);
     }
 
@@ -252,6 +288,27 @@ eRetCode DiskCloneUtil::RemovePartTable(U32 dstidx) {
     return RET_OK;
 }
 
+eRetCode DiskCloneUtil::GenPrepareScript(const sDcDriveInfo& di, std::string& script) {
+    // Prepare script:
+    // 1. create mount points for target partitions
+
+    stringstream sstr;
+    for (U32 i = 0; i < di.parr.size(); i++) {
+        const sDcPartInfo& pi = di.parr[i]; string subscr;
+        if (!pi.vi.valid) continue;
+
+        sstr << "mkdir " << pi.vi.mntlink << endl;
+    }
+
+    script = sstr.str();
+
+    if (DBGMODE) {
+        cout << "Create preparation script: " << endl << script << endl;
+    }
+
+    return RET_OK;
+}
+
 static eRetCode GenCreatePartScript(const sDcPartInfo& d, string& script) {
     stringstream sstr;
     string typestr, idstr;
@@ -282,6 +339,11 @@ static eRetCode GenCreatePartScript(const sDcPartInfo& d, string& script) {
              << " id=" << idstr
              << " size=" << size_in_mb
              << " offset=" << offset_in_kb;
+    }
+
+    if(d.vi.valid) {
+        sstr << "format fs=ntfs quick" << endl;
+        sstr << "assign mount=\"" << d.vi.mntlink << "\"";
     }
 
     script = sstr.str();
@@ -319,13 +381,92 @@ eRetCode DiskCloneUtil::GenCreatePartScript(const sDcDriveInfo& di, std::string&
     return RET_OK;
 }
 
+eRetCode DiskCloneUtil::GenCreateShadowScript(const sDcDriveInfo& di, std::string& script) {
+    // DiskPart script:
+    // 1. create target drive: di.drvidx
+    //    diskpart
+    //    select disk dstidx
+    //    create partition primary size=?? offset=??
+    //    exit
+
+    stringstream sstr;
+    for (U32 i = 0; i < di.parr.size(); i++) {
+        const sDcPartInfo& pi = di.parr[i];
+        if (!pi.vi.valid) continue;
+        const sDcVolInfo& vi = pi.vi;
+        sstr << "wmic shadowcopy call create "
+             << "volume=\'" << vi.letter << ":\'" << endl;
+    }
+
+    script = sstr.str();
+
+    if (DBGMODE) {
+        cout << "Create shadow script: " << endl << script << endl;
+    }
+
+    return RET_OK;
+}
+
+eRetCode DiskCloneUtil::ExecShadowCopyScript(sDcDriveInfo& di) {
+
+    // Start child process, feed commands and read the result
+    // Update colume string into di
+    // shadow_id: {d855d64f-524f-4c04-84ef-ec433cadd725}
+    // shadow_vol: \\?\GLOBALROOT\Device\HarddiskVolumeShadowCopy4
+
+    // steps:
+    // start process, connect pipes
+    // send: powershell
+    // send: wmic shadowcopy call create Volume='C:\'
+    // recv:
+    //     Method execution successful.
+    //         Out Parameters:
+    //                          instance of __PARAMETERS
+    //     {
+    //         ReturnValue = 0;
+    //         ShadowID = "{0905D786-CDD4-4F21-8D0F-EB7645382BCF}";
+    //     };
+    // ==> Save "ShadowID" into di
+    // send: vssadmin list shadows /shadow="{0905D786-CDD4-4F21-8D0F-EB7645382BCF}"
+    // recv:
+    //     vssadmin 1.1 - Volume Shadow Copy Service administrative command-line tool
+    //     (C) Copyright 2001-2013 Microsoft Corp.
+    //
+    //     Contents of shadow copy set ID: {809bf920-b0a9-423e-97ec-3f3748aad7d0}
+    //       Contained 1 shadow copies at creation time: 6/4/2023 4:02:22 PM
+    //         Shadow Copy ID: {0905d786-cdd4-4f21-8d0f-eb7645382bcf}
+    //         Original Volume: (C:)\\?\Volume{639d1ccb-652d-49b9-a774-1c7b5de06c3d}\
+    //         Shadow Copy Volume: \\?\GLOBALROOT\Device\HarddiskVolumeShadowCopy5
+    //         Originating Machine: Hi
+    //         Service Machine: Hi
+    //         Provider: 'Microsoft Software Shadow Copy provider 1.0'
+    //         Type: ClientAccessible
+    //         Attributes: Persistent, Client-accessible, No auto release, No writers, Differential
+    // ==> Save "Shadow Copy Volume" into di
+    // send: exit (powershell)
+
+    // start child process and create pipes:
+
+    for (U32 i = 0; i < di.parr.size(); i++) {
+        const sDcPartInfo& pi = di.parr[i];
+        if (!pi.vi.valid) continue;
+        const sDcVolInfo& vi = pi.vi;
+
+    }
+
+    return RET_OK;
+}
+
 static string GenScriptFileName() {
     return string(tmpnam(NULL));
 }
 
-static eRetCode ExecCommand(const string& dpcmd) {
+// cmdstr: + a windows command: diskpart /s dpscript.scr
+// cmdstr: + a windows command: powershell -command "ps command"
+//         + a script file named <file>.cmd
+static eRetCode ExecCommand(const string& cmdstr) {
     char cmdline[ MAX_PATH];
-    sprintf( cmdline, "cmd.exe /c %s", dpcmd.c_str());
+    sprintf( cmdline, "cmd.exe /c %s", cmdstr.c_str());
 
     PROCESS_INFORMATION pi; memset( &pi, 0, sizeof(pi));
     STARTUPINFOA si; memset( &si, 0, sizeof(si)); si.cb = sizeof(si);
@@ -349,7 +490,19 @@ static eRetCode ExecCommand(const string& dpcmd) {
     return RET_OK;
 }
 
-eRetCode DiskCloneUtil::ExecScript(std::string& script) {
+eRetCode DiskCloneUtil::ExecShCmdList(std::string& script) {
+    // Start child process
+    // Execute shell script
+
+    string base = GenScriptFileName();
+    string fname = "./" + base + ".cmd";
+    ofstream fstr; fstr.open (fname);
+    fstr << script << endl; fstr.close();
+    ExecCommand(fname); remove(fname.c_str());
+    return RET_OK;
+}
+
+eRetCode DiskCloneUtil::ExecDpCmdList(std::string& script) {
     // Start child process
     // Execute diskpart /s script
 
@@ -369,6 +522,18 @@ eRetCode DiskCloneUtil::ExecScript(std::string& script) {
     ExecCommand(cmd);
 
     remove(fname.c_str()); remove(lname.c_str());
+    return RET_OK;
+}
+
+eRetCode DiskCloneUtil::ExecPsCmdList(std::string& script) {
+    // Start child process
+    // Execute shell script
+
+    string base = GenScriptFileName();
+    string fname = "./" + base + ".cmd";
+    ofstream fstr; fstr.open (fname);
+    fstr << script << endl; fstr.close();
+    ExecCommand(fname); remove(fname.c_str());
     return RET_OK;
 }
 
@@ -507,7 +672,7 @@ static eRetCode InitProgress(const sDcDriveInfo& di, volatile sProgress* p) {
     return RET_OK;
 }
 
-eRetCode DiskCloneUtil::HandleCloneDrive(
+eRetCode DiskCloneUtil::HandleCloneDrive_RawCopy(
     CSTR& dstdrv, CSTR& srcdrv, tConstAddrArray& parr, volatile sProgress* p) {
     U32 sidx, didx;
     if (RET_OK != GetDriveIndex(srcdrv, sidx)) return RET_INVALID_ARG;
@@ -520,7 +685,48 @@ eRetCode DiskCloneUtil::HandleCloneDrive(
         if (RET_OK != GenDestRange(si, didx, di)) break;
         if (RET_OK != RemovePartTable(didx)) break;
         if (RET_OK != GenCreatePartScript(di, script)) break;
-        if (RET_OK != ExecScript(script)) break;
+        if (RET_OK != ExecDpCmdList(script)) break;
+        if (RET_OK != VerifyPartition(didx, di)) break;
+
+        // count total dst size & update progress
+        if (RET_OK != InitProgress(di, p)) break;
+        if (RET_OK != ClonePartitions(si, di, p)) break;
+        return RET_OK;
+    } while(0);
+
+    if (DBGMODE) cout << "FAIL" << endl;
+
+    if (p && !p->workload) {
+        INIT_PROGRESS(p, 0); FINALIZE_PROGRESS(p, RET_FAIL);
+    }
+    return RET_FAIL;
+}
+
+// --------------------------------------------------------------------------------
+// ShadowCopy implementation
+
+eRetCode DiskCloneUtil::HandleCloneDrive_ShadowCopy(
+    CSTR& dstdrv, CSTR& srcdrv, tConstAddrArray& parr, volatile sProgress* p) {
+    U32 sidx, didx;
+    if (RET_OK != GetDriveIndex(srcdrv, sidx)) return RET_INVALID_ARG;
+    if (RET_OK != GetDriveIndex(dstdrv, didx)) return RET_INVALID_ARG;
+
+    sDcDriveInfo si, di; string script;
+    do {
+        if (RET_OK != GetDriveInfo(sidx, si)) break;
+        if (RET_OK != FilterPartition(parr, si)) break;
+        if (RET_OK != GenDestRange(si, didx, di)) break;
+        if (RET_OK != RemovePartTable(didx)) break;
+
+        if (RET_OK != GenPrepareScript(di, script)) break;
+        if (RET_OK != ExecShCmdList(script)) break;
+
+        if (RET_OK != GenCreatePartScript(di, script)) break;
+        if (RET_OK != ExecDpCmdList(script)) break;
+
+        if (RET_OK != GenCreateShadowScript(di, script)) break;
+        if (RET_OK != ExecPsCmdList(script)) break;
+
         if (RET_OK != VerifyPartition(didx, di)) break;
 
         // count total dst size & update progress
@@ -589,6 +795,6 @@ eRetCode DiskCloneUtil::TestCloneDrive(U32 didx, U32 sidx, U64 extsize) {
         }
     }
 
-    return HandleCloneDrive(dstdrv, srcdrv, parr);
+    return HandleCloneDrive_RawCopy(dstdrv, srcdrv, parr);
 }
 

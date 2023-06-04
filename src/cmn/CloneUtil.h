@@ -22,12 +22,24 @@ namespace DiskCloneUtil { // DC
         DPT_PARTITION_MSFT_RECOVERY_GUID,
     };
 
+    struct sDcVolInfo {
+        bool valid;
+        char letter; // original volume letter
+        std::string shalink; // shadowcopy mount point
+        std::string mntlink; // target volume mount point
+
+        std::string shaid;  // shadow_id string
+        std::string shavol; // shadow_volume string
+    };
+
     struct sDcPartInfo {
         U32 pidx;   // 1, 2, 3
         U32 ptype;  // PARTITION_BASIC_DATA_GUID ...
         U64 start;  // in bytes
         U64 psize;  // in bytes
         U64 nsize;  // new size in bytes (expanded)
+
+        sDcVolInfo vi; // volume info on this partition
     };
 
     struct sDcDriveInfo {
@@ -42,15 +54,29 @@ namespace DiskCloneUtil { // DC
     StorageApi::eRetCode FilterPartition(StorageApi::tConstAddrArray &parr, sDcDriveInfo& si);
     StorageApi::eRetCode GenDestRange(const sDcDriveInfo& si, U32 dstidx, sDcDriveInfo& di);
     StorageApi::eRetCode RemovePartTable(U32 dstidx);
+
+    StorageApi::eRetCode GenPrepareScript(const sDcDriveInfo& di, std::string& script);
     StorageApi::eRetCode GenCreatePartScript(const sDcDriveInfo& di, std::string& script);
-    StorageApi::eRetCode ExecScript(std::string& script);
+    StorageApi::eRetCode GenCreateShadowScript(const sDcDriveInfo& di, std::string& script);
+
+    StorageApi::eRetCode ExecShCmdList(std::string& script);
+    StorageApi::eRetCode ExecDpCmdList(std::string& script);
+    StorageApi::eRetCode ExecPsCmdList(std::string& script);
+
+    StorageApi::eRetCode ExecShadowCopyScript(sDcDriveInfo& di);
+
     StorageApi::eRetCode VerifyPartition(U32 dstidx, const sDcDriveInfo& di);
     StorageApi::eRetCode ClonePartitions(
         const sDcDriveInfo& si, const sDcDriveInfo& di,
         volatile StorageApi::sProgress* p = NULL);
 
     // Called from StorageApi
-    StorageApi::eRetCode HandleCloneDrive(
+    StorageApi::eRetCode HandleCloneDrive_RawCopy(
+        StorageApi::CSTR& dstdrv, StorageApi::CSTR& srcdrv,
+        StorageApi::tConstAddrArray& parr, volatile StorageApi::sProgress* p = NULL);
+
+    // Called from StorageApi
+    StorageApi::eRetCode HandleCloneDrive_ShadowCopy(
         StorageApi::CSTR& dstdrv, StorageApi::CSTR& srcdrv,
         StorageApi::tConstAddrArray& parr, volatile StorageApi::sProgress* p = NULL);
 

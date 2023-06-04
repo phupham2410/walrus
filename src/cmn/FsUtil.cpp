@@ -17,24 +17,6 @@ using namespace FsUtil;
 
 #define DBGMODE 1
 
-struct sDiskExtInfo {
-    U32 drvidx;
-    U64 offset; // offset in byte unit
-    U64 length; // length in byte unit
-};
-
-struct sVolDiskExtInfo {
-    char letter;          // D
-    std::wstring name;    // My Storage"
-    std::wstring fsname;  // NTFS
-    U64 usedsize;         // size in byte unit
-    U64 freesize;         // size in byte unit
-    U64 totalsize;        // size in byte unit
-    std::vector<sDiskExtInfo> di;
-};
-
-typedef std::vector<sVolDiskExtInfo> tVolArray;
-
 static eRetCode GetDriveIndex(const std::string& name, U32& index) {
     const char* p = name.c_str();
     while(*p && !INRANGE('0', '9' + 1, *p)) p++;
@@ -134,7 +116,7 @@ static eRetCode UtilGetVolInfo(const string& volname, sVolDiskExtInfo& vi) {
     free(vd); return RET_OK;
 }
 
-static eRetCode UtilScanVolumeInfo(tVolArray& va) {
+eRetCode ScanVolumeInfo(tVolArray& va) {
     va.clear();
     eRetCode ret; vector<string> vollist;
     ret = UtilScanVolList(vollist);
@@ -182,7 +164,7 @@ static void UtilUpdatePartInfo(const tVolArray& va, U32 drvidx, sPartInfo& pi) {
 }
 
 eRetCode FsUtil::UpdateVolumeInfo(tDriveArray& da) {
-    tVolArray va; UtilScanVolumeInfo(va);
+    tVolArray va; ScanVolumeInfo(va);
     for(auto& d:da) {
         U32 drvidx;
         GetDriveIndex(d.name, drvidx);
