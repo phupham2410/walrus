@@ -180,7 +180,7 @@ eRetCode DiskCloneUtil::GetDriveInfo(U32 srcidx, sDcDriveInfo& si) {
     HDL hdl;
     if (RET_OK != UtilOpenFile(srcidx, hdl)) return RET_INVALID_ARG;
 
-    tVolArray va; ScanVolumeInfo(va);
+    tVolArray va; FsUtil::ScanVolumeInfo(va);
 
     // Read DriveLayout and Partitions
     // Fill in si

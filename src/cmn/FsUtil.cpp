@@ -116,7 +116,7 @@ static eRetCode UtilGetVolInfo(const string& volname, sVolDiskExtInfo& vi) {
     free(vd); return RET_OK;
 }
 
-eRetCode ScanVolumeInfo(tVolArray& va) {
+eRetCode FsUtil::ScanVolumeInfo(tVolArray& va) {
     va.clear();
     eRetCode ret; vector<string> vollist;
     ret = UtilScanVolList(vollist);
