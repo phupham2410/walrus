@@ -718,12 +718,15 @@ eRetCode DiskCloneUtil::HandleCloneDrive_ShadowCopy(
         if (RET_OK != GenDestRange(si, didx, di)) break;
         if (RET_OK != RemovePartTable(didx)) break;
 
+        // Make dir for target volumes
         if (RET_OK != GenPrepareScript(di, script)) break;
         if (RET_OK != ExecShCmdList(script)) break;
 
+        // Create partitons on target drive, mount data partitions
         if (RET_OK != GenCreatePartScript(di, script)) break;
         if (RET_OK != ExecDpCmdList(script)) break;
 
+        // Create shadows objects,
         if (RET_OK != GenCreateShadowScript(di, script)) break;
         if (RET_OK != ExecPsCmdList(script)) break;
 

@@ -2,37 +2,29 @@
 #include "StdHeader.h"
 #include "SystemUtil.h"
 #include "StorageApi.h"
+#include "CloneUtil.h"
 
 using namespace std;
 using namespace StorageApi;
+using namespace DiskCloneUtil;
 
 #define DBGMODE 1
 
 #define DUMPERR(msg) \
     cout << msg << ". " << SystemUtil::GetLastErrorString() << endl
 
-#define BUFSIZE 4096
-
-HANDLE g_hChildStd_IN_Rd = NULL;
-HANDLE g_hChildStd_IN_Wr = NULL;
-HANDLE g_hChildStd_OUT_Rd = NULL;
-HANDLE g_hChildStd_OUT_Wr = NULL;
-
-HANDLE g_hInputFile = NULL;
-
-void CreateChildProcess(void);
-void WriteToPipe(void);
-void ReadFromPipe(void);
-void ErrorExit(const char* s);
+static string GenScriptFileName() {
+    return "sample_script.";
+    return string(tmpnam(NULL));
+}
 
 // cmdstr: + a windows command: diskpart /s dpscript.scr
 // cmdstr: + a windows command: powershell -command "ps command"
 //         + a script file named <file>.cmd
-static eRetCode ExecCommand(const string& cmdstr, U8* buffer, U32 bufsize, U32& datasize) {
+
+static eRetCode ExecCommand(const string& cmdstr, string* rstr = NULL) {
     HANDLE cso_rd = NULL; // child std out handle
     HANDLE cso_wr = NULL; // child std out handle
-
-    memset(buffer, 0x00, bufsize); datasize = 0;
 
     // Set the bInheritHandle flag so pipe handles are inherited.
     SECURITY_ATTRIBUTES sa; sa.nLength = sizeof(sa);
@@ -67,196 +59,164 @@ static eRetCode ExecCommand(const string& cmdstr, U8* buffer, U32 bufsize, U32& 
     // Close handles to the stdin and stdout pipes no longer needed by the child process.
     CloseHandle(cso_wr);
 
-    eRetCode ret = RET_OK;
-
     if (!status) {
         DUMPERR("Cannot create child process");
+        return RET_FAIL;
     }
-    else {
-        // read output from pipe
-        DWORD readsize; U32 remsize = bufsize;
-        const U32 tmpsize = BUFSIZE; char tmp[tmpsize];
 
+    // read output from pipe
+    DWORD readsize;
+    const U32 tmpsize = 1024; char tmp[tmpsize];
+
+    if (rstr) {
         for (;;) {
-            BOOL trim = FALSE;
             status = ReadFile(cso_rd, tmp, tmpsize, &readsize, NULL);
             if(!status || !readsize) break;
 
-            if (!remsize) {
-                cout << "Input buffer not enough" << endl;
-                ret = RET_OUT_OF_SPACE; break;
-            }
-
-            if (remsize < readsize) {
-                readsize = remsize; trim = TRUE;
-            }
-
-            // memcpy into output buffer
-            memcpy(buffer + datasize, tmp, readsize);
-            datasize += readsize; remsize -= readsize;
-
-            if (trim) {
-                cout << "Data trimmed" << endl;
-                ret = RET_OUT_OF_SPACE; break;
-            }
+            *rstr += string((S8*) tmp, readsize);
         }
-        WaitForSingleObject( pi.hProcess, INFINITE );
+    }
+    WaitForSingleObject( pi.hProcess, INFINITE );
 
-        DWORD err = 0;
-        GetExitCodeProcess( pi.hProcess, &err );
-        if(err) DUMPERR("Execute command fail");
-
-        CloseHandle( pi.hProcess );
+    DWORD err = 0;
+    GetExitCodeProcess( pi.hProcess, &err );
+    if(err) {
+        DUMPERR("Execute command fail");
+        return RET_FAIL;
     }
 
-    return ret;
+    CloseHandle( pi.hProcess );
+    return RET_OK;
 }
 
-static eRetCode ExecCommand(const string& cmdstr, string& output) {
-    bool stop; eRetCode ret;
-    U32 bufsize = 1024, datasize;
-    do {
-        U8* ptr  = new U8[bufsize]; stop = true;
-        ret = ExecCommand(cmdstr, ptr, bufsize, datasize);
-        if (ret == RET_OK) {
-            output = string((S8*)ptr, datasize);
-        }
-        else if(ret == RET_OUT_OF_SPACE) {
-            stop = false; bufsize *= 2;
-        }
-        delete[] ptr;
-    } while(!stop);
-    return ret;
+static eRetCode ExecCommand(const vector<string>& cmdlist, string& rstr) {
+    // create a script file:
+    stringstream sstr;
+    for(auto c : cmdlist) sstr << c << endl;
+
+    string base = GenScriptFileName();
+    string fname = "./" + base + "cmd";
+
+    ofstream fstr; fstr.open (fname);
+    fstr << sstr.str(); fstr.close();
+    eRetCode ret = ExecCommand(fname, &rstr);
+    remove(fname.c_str()); return ret;
 }
 
-static bool ParseString_ShadowID(const string& str, string& result) {
-    stringstream sstr(str); string line;
+static eRetCode ParseString_ShadowID(const string& str, string& result) {
+    stringstream sstr(str);
+    string line;
+    const string prefix = "ShadowID = \"{";
+    const string postfix = "}\"";
     while(getline(sstr, line, '\n')) {
-        size_t pos0 = line.find("ShadowID = \"{");
+        size_t pos0 = line.find(prefix);
         if (pos0 == string::npos) continue;
-
-        size_t pos1 = line.find("}\"");
+        pos0 += prefix.length();
+        size_t pos1 = line.find(postfix);
         if (pos1 == string::npos) continue;
-
-        result = line;
-        return true;
+        result = line.substr(pos0, pos1 - pos0);
+        return RET_OK;
     }
-    return false;
+    return RET_NOT_FOUND;
+}
+
+static eRetCode ParseString_ShadowVol(const string& str, string& vol) {
+    stringstream sstr(str);
+    string line;
+    const string prefix = "Shadow Copy Volume: ";
+    while(getline(sstr, line, '\n')) {
+        size_t pos0 = line.find(prefix);
+        if (pos0 == string::npos) continue;
+        pos0 += prefix.length();
+        vol = line.substr(pos0);
+        return RET_OK;
+    }
+    return RET_NOT_FOUND;
+}
+
+static eRetCode CreateShadowCopy(vector<sDcPartInfo>& parr) {
+    for (U32 i = 0, maxi = parr.size(); i < maxi; i++) {
+        sDcPartInfo& info = parr[i];
+        if (!info.vi.valid) continue;
+        sDcVolInfo& vi = info.vi;
+
+        do {
+            stringstream sstr; string output, id;
+            sstr << "wmic shadowcopy call create volume=" << vi.letter << ":\\";
+            cout << "Executing command1: " << sstr.str() << endl;
+            if (RET_OK != ExecCommand(sstr.str(), &output)) break;
+            if (RET_OK != ParseString_ShadowID(output, vi.shaid)) break;
+        } while(0);
+
+        do {
+            stringstream sstr; string output, id;
+            sstr << "vssadmin list shadows /shadow=\"{" << vi.shaid << "}\"";
+            cout << "Executing command2: " << sstr.str() << endl;
+            if (RET_OK != ExecCommand(sstr.str(), &output)) break;
+            if (RET_OK != ParseString_ShadowVol(output, vi.shavol)) break;
+            cout << "Result command2: " << vi.shavol << endl;
+        } while(0);
+
+        do {
+            stringstream sstr; string output, id;
+            sstr << "rmdir " << vi.shalink << " /Q";
+            cout << "Executing command3: " << sstr.str() << endl;
+            if (RET_OK != ExecCommand(sstr.str(), NULL)) break;
+        } while(0);
+
+        do {
+            stringstream sstr; string output, id;
+            sstr << "mklink /d " << vi.shalink << " " << vi.shavol << "\\";
+            cout << "Executing command4: " << sstr.str() << endl;
+            if (RET_OK != ExecCommand(sstr.str(), NULL)) break;
+        } while(0);
+    }
+
+    return RET_OK;
 }
 
 int main(int argc, char **argv) {
+    vector<sDcPartInfo> parr;
 
-    eRetCode ret;
+    if(0) {
+        sDcPartInfo info;
+        sDcVolInfo& vi = info.vi;
+        vi.valid = true;
+        vi.letter = 'C';
+        vi.shalink = "C:\\sha_link_c";
+        parr.push_back(info);
+    }
+
+    if(1) {
+        sDcPartInfo info;
+        sDcVolInfo& vi = info.vi;
+        vi.valid = true;
+        vi.letter = 'G';
+        vi.shalink = "G:\\sha_link_d";
+        parr.push_back(info);
+    }
+
+    if (RET_OK != CreateShadowCopy(parr)) {
+        cout << "Cannot exec command" << endl; return 1;
+    }
+    return 0;
+}
+
+int main_backup(int argc, char **argv) {
     string output;
 
     string create_shadow_copy = "wmic shadowcopy call create volume=c:\\";
     string dircmd = "dir";
 
-    ret = ExecCommand(create_shadow_copy, output);
-    if (ret == RET_OK) {
-        string shadowid;
-        if (ParseString_ShadowID(output, shadowid)) {
-            cout << "Data read from child process: " << endl;
-            cout << shadowid << endl;
-        }
+    if (RET_OK != ExecCommand(create_shadow_copy, &output)) {
+        cout << "Cannot exec command" << endl; return 1;
     }
-    else {
-        cout << "Cannot exec command" << endl;
+    string shadowid;
+    if (RET_OK != ParseString_ShadowID(output, shadowid)) {
+        cout << "Command return error" << endl; return 1;
     }
+    cout << "Data read from child process: " << endl << shadowid << endl;
+
 
     return 0;
-}
-
-// Create a child process that uses the previously created pipes for STDIN and STDOUT.
-void CreateChildProcess() {
-    TCHAR szCmdline[]=TEXT("child");
-    PROCESS_INFORMATION pi;
-    STARTUPINFO si;
-    BOOL bSuccess = FALSE;
-
-    // Set up members of the PROCESS_INFORMATION structure.
-    ZeroMemory( &pi, sizeof(PROCESS_INFORMATION) );
-
-    // Set up members of the STARTUPINFO structure.
-    // This structure specifies the STDIN and STDOUT handles for redirection.
-    ZeroMemory( &si, sizeof(STARTUPINFO) );
-    si.cb = sizeof(STARTUPINFO);
-    si.hStdError = g_hChildStd_OUT_Wr;
-    si.hStdOutput = g_hChildStd_OUT_Wr;
-    si.hStdInput = g_hChildStd_IN_Rd;
-    si.dwFlags |= STARTF_USESTDHANDLES;
-
-    // Create the child process.
-    bSuccess = CreateProcess(NULL, szCmdline, // command line
-                             NULL,            // process security attributes
-                             NULL,            // primary thread security attributes
-                             TRUE,            // handles are inherited
-                             0,               // creation flags
-                             NULL,            // use parent's environment
-                             NULL,            // use parent's current directory
-                             &si,             // STARTUPINFO pointer
-                             &pi);    // receives PROCESS_INFORMATION
-
-    // If an error occurs, exit the application.
-    if ( ! bSuccess ) {
-        ErrorExit("CreateProcess");
-    }
-    else {
-        // Close handles to the child process and its primary thread.
-        // Some applications might keep these handles to monitor the status
-        // of the child process, for example.
-        CloseHandle(pi.hProcess);
-        CloseHandle(pi.hThread);
-
-        // Close handles to the stdin and stdout pipes no longer needed by the child process.
-        // If they are not explicitly closed, there is no way to recognize that the child process has ended.
-        CloseHandle(g_hChildStd_OUT_Wr);
-        CloseHandle(g_hChildStd_IN_Rd);
-    }
-}
-
-// Read from a file and write its contents to the pipe for the child's STDIN.
-// Stop when there is no more data.
-void WriteToPipe(void) {
-    DWORD dwRead, dwWritten;
-    CHAR chBuf[BUFSIZE];
-    BOOL bSuccess = FALSE;
-
-    for (;;) {
-        bSuccess = ReadFile(g_hInputFile, chBuf, BUFSIZE, &dwRead, NULL);
-        if ( ! bSuccess || dwRead == 0 ) break;
-
-        bSuccess = WriteFile(g_hChildStd_IN_Wr, chBuf, dwRead, &dwWritten, NULL);
-        if ( ! bSuccess ) break;
-    }
-
-    // Close the pipe handle so the child process stops reading.
-    if ( ! CloseHandle(g_hChildStd_IN_Wr) ) {
-        ErrorExit("StdInWr CloseHandle");
-    }
-}
-
-// Read output from the child process's pipe for STDOUT
-// and write to the parent process's pipe for STDOUT.
-// Stop when there is no more data.
-void ReadFromPipe(void) {
-    DWORD dwRead, dwWritten;
-    CHAR chBuf[BUFSIZE];
-    BOOL bSuccess = FALSE;
-    HANDLE hParentStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
-
-    for (;;) {
-        bSuccess = ReadFile( g_hChildStd_OUT_Rd, chBuf, BUFSIZE, &dwRead, NULL);
-        if( ! bSuccess || dwRead == 0 ) break;
-
-        bSuccess = WriteFile(hParentStdOut, chBuf, dwRead, &dwWritten, NULL);
-        if (! bSuccess ) break;
-    }
-}
-
-// Format a readable error message, display a message box,
-// and exit from the application.
-void ErrorExit(const char* lpszFunction) {
-    printf("ErrorExit: %s\n", lpszFunction);
-    ExitProcess(1);
 }

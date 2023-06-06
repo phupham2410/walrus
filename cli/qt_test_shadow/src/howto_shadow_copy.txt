@@ -1,0 +1,63 @@
+Preparation:
+For raw partition:
+--> SectorCopy
+
+For basic data partition with letter: shadow copy
+
+Order:
+
+Create partitions, assign letters with diskpart
+CommandLine
+
+Create shadow copies:
+PowerShell
+wmic shadowcopy call create Volume='C:\'
+wmic shadowcopy call create Volume='D:\'
+wmic shadowcopy call create Volume='Z:\'
+
+Scan for ShadowID
+PowerShell
+vssadmin list shadows
+
+Create symbolic links for each copy:
+CommandLine
+mklink /d C:\sha \\?\GLOBALROOT\Device\HarddiskVolumeShadowCopy4\
+mklink /d D:\sha \\?\GLOBALROOT\Device\HarddiskVolumeShadowCopy5\
+mklink /d Z:\sha \\?\GLOBALROOT\Device\HarddiskVolumeShadowCopy7\
+
+Copy shadows
+PowerShell
+Copy-Item -Path "C:\sha\*" -Destination "G:\" -Recurse
+Copy-Item -Path "D:\sha\*" -Destination "H:\" -Recurse
+Copy-Item -Path "Z:\sha\*" -Destination "K:\" -Recurse
+
+Delete shadows
+PowerShell
+vssadmin delete shadows /For=C: /all /quiet
+vssadmin delete shadows /For=D: /all /quiet
+vssadmin delete shadows /For=Z: /all /quiet
+
+Delete Links:
+How to delete symbolic links ?
+rmdir C:\sha /Q
+
+// -----------------------------------------------------------------
+
+ExecScript_PowerShell(const string& script)
+ExecScript_CommandLine(const string& script)
+
+
+
+
+DcVolumeInfo {
+	char src_letter;
+	string createtime; // 6/2/2023 10:02:31 PM
+	string shadowid;   // {23485c77-8095-4a16-841c-4316191996d8}
+	string shadowcopy; // \\?\GLOBALROOT\Device\HarddiskVolumeShadowCopy5\
+	string src_link;
+	char dst_letter;
+	
+	U64 dst_cap;       // for checking progress
+}
+
+
