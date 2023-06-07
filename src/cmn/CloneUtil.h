@@ -58,21 +58,20 @@ namespace DiskCloneUtil { // DC
     StorageApi::eRetCode GenPrepareScript(const sDcDriveInfo& di, std::string& script);
     StorageApi::eRetCode GenCreatePartScript(const sDcDriveInfo& di, std::string& script);
 
-    StorageApi::eRetCode ExecCommandList(std::string& script);
-    StorageApi::eRetCode ExecDiskPartScript(std::string& script);
-    StorageApi::eRetCode ExecPsCmdList(std::string& script);
+    StorageApi::eRetCode ExecCommand(const std::string& cmdstr, std::string* rstr = NULL);
+    StorageApi::eRetCode ExecCommandList(const std::string& script);
+    StorageApi::eRetCode ExecDiskPartScript(const std::string& script);
 
     StorageApi::eRetCode VerifyPartition(U32 dstidx, const sDcDriveInfo& di);
+
+    enum eCloneCode {
+        CLONE_SYS = 0x1,
+        CLONE_DATA = 0x2,
+        CLONE_ALL = 0x3,
+    };
+
     StorageApi::eRetCode ClonePartitions(
-        const sDcDriveInfo& si, const sDcDriveInfo& di,
-        volatile StorageApi::sProgress* p = NULL);
-
-    StorageApi::eRetCode CloneSystemPartitions(
-        const sDcDriveInfo& si, const sDcDriveInfo& di,
-        volatile StorageApi::sProgress* p = NULL);
-
-    StorageApi::eRetCode CloneDataPartitions(
-        const sDcDriveInfo& si, const sDcDriveInfo& di,
+        const sDcDriveInfo& si, const sDcDriveInfo& di, eCloneCode code,
         volatile StorageApi::sProgress* p = NULL);
 
     // Called from StorageApi

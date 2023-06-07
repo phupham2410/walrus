@@ -388,7 +388,7 @@ static string GenScriptFileName() {
 // cmdstr: + a windows command: diskpart /s dpscript.scr
 // cmdstr: + a windows command: powershell -command "ps command"
 //         + a script file named <file>.cmd
-static eRetCode ExecCommand(const string& cmdstr) {
+static eRetCode ExecCommandOnly(const string& cmdstr) {
     char cmdline[ MAX_PATH];
     sprintf( cmdline, "cmd.exe /c %s", cmdstr.c_str());
 
@@ -414,7 +414,7 @@ static eRetCode ExecCommand(const string& cmdstr) {
     return RET_OK;
 }
 
-eRetCode DiskCloneUtil::ExecCommandList(std::string& script) {
+eRetCode DiskCloneUtil::ExecCommandList(const std::string& script) {
     // Start child process
     // Execute shell script
 
@@ -422,11 +422,11 @@ eRetCode DiskCloneUtil::ExecCommandList(std::string& script) {
     string fname = "./" + base + ".cmd";
     ofstream fstr; fstr.open (fname);
     fstr << script << endl; fstr.close();
-    ExecCommand(fname); remove(fname.c_str());
+    ExecCommandOnly(fname); remove(fname.c_str());
     return RET_OK;
 }
 
-eRetCode DiskCloneUtil::ExecDiskPartScript(std::string& script) {
+eRetCode DiskCloneUtil::ExecDiskPartScript(const std::string& script) {
     // Start child process
     // Execute diskpart /s script
 
@@ -443,21 +443,9 @@ eRetCode DiskCloneUtil::ExecDiskPartScript(std::string& script) {
         cout << "Script: " << fname << "; " << "Command: " << cmd << endl;
     }
 
-    ExecCommand(cmd);
+    ExecCommandOnly(cmd);
 
     remove(fname.c_str()); remove(lname.c_str());
-    return RET_OK;
-}
-
-eRetCode DiskCloneUtil::ExecPsCmdList(std::string& script) {
-    // Start child process
-    // Execute shell script
-
-    string base = GenScriptFileName();
-    string fname = "./" + base + ".cmd";
-    ofstream fstr; fstr.open (fname);
-    fstr << script << endl; fstr.close();
-    ExecCommand(fname); remove(fname.c_str());
     return RET_OK;
 }
 
@@ -506,9 +494,8 @@ eRetCode DiskCloneUtil::VerifyPartition(U32 dstidx, const sDcDriveInfo& di) {
 }
 
 static eRetCode CopyPartition(
-    StorageApi::HDL shdl, U64 sadd, U64 size,
-    StorageApi::HDL dhdl, U64 dadd,
-    volatile sProgress* p) {
+    HDL shdl, U64 sadd, U64 size,
+    HDL dhdl, U64 dadd, volatile sProgress* p) {
     // Copy data block from src_drv to dst_drv
     if ((size % 512) || (sadd % 512) || (dadd % 512)) return RET_INVALID_ARG;
 
@@ -556,8 +543,24 @@ static eRetCode CopyPartition(
     return rem_sec ? RET_FAIL : RET_OK;
 }
 
+static eRetCode CopyShadow(const string& slnk, const string& dlnk, volatile sProgress* p) {
+    // copy data from link to link using CopyItem
+    // string cmd = "Copy-Item -Path "C:\sha\*" -Destination "G:\" -Recurse";
+    S8 cmdbuffer[1024]; string output;
+    string src = "\"" + slnk + "\\*\"", dst = "\"" + dlnk + "\"";
+    sprintf(cmdbuffer, "Copy-Item -Path %s -Destination %s -Recurse", src.c_str(), dst.c_str());
+
+    // start child process to check remaining space:
+
+    eRetCode ret = ExecCommand(string(cmdbuffer), &output);
+
+    // parse output to get uncopied files:
+
+    return ret;
+}
+
 eRetCode DiskCloneUtil::ClonePartitions(
-    const sDcDriveInfo& si, const sDcDriveInfo& di, volatile sProgress* p) {
+    const sDcDriveInfo& si, const sDcDriveInfo& di, eCloneCode code, volatile sProgress* p) {
     U32 pcnt = si.parr.size();
     if (pcnt != di.parr.size()) return StorageApi::RET_INVALID_ARG;
 
@@ -569,12 +572,14 @@ eRetCode DiskCloneUtil::ClonePartitions(
     for (i = 0; i < pcnt; i++) {
         const sDcPartInfo& sp = si.parr[i];
         const sDcPartInfo& dp = di.parr[i];
+        if (DBGMODE) cout << "Copy partition " << i << endl;
 
-        if (DBGMODE) {
-            cout << "Copy partition " << i << endl;
+        if ((code == CLONE_ALL) || ((code == CLONE_SYS) && !sp.vi.valid)) {
+            if (RET_OK != CopyPartition(shdl, sp.start, sp.psize, dhdl, dp.start, p)) break;
         }
-
-        if (RET_OK != CopyPartition(shdl, sp.start, sp.psize, dhdl, dp.start, p)) break;
+        else if ((code == CLONE_DATA) && sp.vi.valid) {
+            if (RET_OK != CopyShadow(sp.vi.shalink, dp.vi.mntlink,  p)) break;
+        }
     }
 
     Close(shdl); Close(dhdl);
@@ -614,7 +619,7 @@ eRetCode DiskCloneUtil::HandleCloneDrive_RawCopy(
 
         // count total dst size & update progress
         if (RET_OK != InitProgress(di, p)) break;
-        if (RET_OK != ClonePartitions(si, di, p)) break;
+        if (RET_OK != ClonePartitions(si, di, CLONE_ALL, p)) break;
         return RET_OK;
     } while(0);
 
@@ -629,10 +634,136 @@ eRetCode DiskCloneUtil::HandleCloneDrive_RawCopy(
 // --------------------------------------------------------------------------------
 // ShadowCopy implementation
 
+// Exec command in child process. Get output text in rstr
+eRetCode DiskCloneUtil::ExecCommand(const string& cmdstr, string* rstr) {
+    HANDLE cso_rd = NULL; // child std out handle
+    HANDLE cso_wr = NULL; // child std out handle
 
-static eRetCode CreateShadowCopy(vector<sDcPartInfo>& parr) {
+    // Set the bInheritHandle flag so pipe handles are inherited.
+    SECURITY_ATTRIBUTES sa; sa.nLength = sizeof(sa);
+    sa.bInheritHandle = TRUE; sa.lpSecurityDescriptor = NULL;
+
+    // Create a pipe for the child process's STDOUT.
+    if (!CreatePipe(&cso_rd, &cso_wr, &sa, 0) ) {
+        if (DBGMODE) cout << "Cannot create pipe" << endl;
+        return RET_FAIL;
+    }
+
+    // Ensure the read handle to the pipe for STDOUT is not inherited.
+    if (!SetHandleInformation(cso_rd, HANDLE_FLAG_INHERIT, 0)) {
+        if (DBGMODE) cout << "SetHandleInformation fail" << endl;
+        return RET_FAIL;
+    }
+
+    // ----------------------------------------------------------------
+
+    char cmdline[ MAX_PATH];
+    sprintf( cmdline, "cmd.exe /c %s", cmdstr.c_str());
+
+    PROCESS_INFORMATION pi; memset(&pi, 0, sizeof(pi));
+    STARTUPINFOA si; memset( &si, 0, sizeof(si));
+    si.cb = sizeof(si);
+    si.hStdError = cso_wr;
+    si.hStdOutput = cso_wr;
+    si.dwFlags |= STARTF_USESTDHANDLES;
+
+    BOOL status;
+    status = CreateProcessA( NULL, cmdline, NULL, NULL, TRUE,
+                            NORMAL_PRIORITY_CLASS | CREATE_NO_WINDOW, NULL, NULL, &si, &pi );
+
+    // Close handles to the stdin and stdout pipes no longer needed by the child process.
+    CloseHandle(cso_wr);
+
+    if (!status) {
+        if (DBGMODE) cout << "Cannot create child process" << endl;
+        return RET_FAIL;
+    }
+
+    if (rstr) {
+        DWORD readsize;
+        const U32 tmpsize = 1024; char tmp[tmpsize];
+        for (;;) {
+            status = ReadFile(cso_rd, tmp, tmpsize, &readsize, NULL);
+            if(!status || !readsize) break;
+            *rstr += string((S8*) tmp, readsize);
+        }
+    }
+    WaitForSingleObject( pi.hProcess, INFINITE );
+
+    DWORD err = 0;
+    GetExitCodeProcess( pi.hProcess, &err );
+    if(err) {
+        if (DBGMODE) cout << "Execute command fail" << endl;
+        return RET_FAIL;
+    }
+
+    CloseHandle( pi.hProcess );
     return RET_OK;
 }
+
+static eRetCode ParseShadowID(const string& str, string& result) {
+    stringstream sstr(str);
+    string line;
+    const string prefix = "ShadowID = \"{";
+    const string postfix = "}\"";
+    while(getline(sstr, line, '\n')) {
+        size_t pos0 = line.find(prefix);
+        if (pos0 == string::npos) continue;
+        pos0 += prefix.length();
+        size_t pos1 = line.find(postfix);
+        if (pos1 == string::npos) continue;
+        result = line.substr(pos0, pos1 - pos0);
+        return RET_OK;
+    }
+    return RET_NOT_FOUND;
+}
+
+static eRetCode ParseShadowVolume(const string& str, string& vol) {
+    stringstream sstr(str);
+    string line;
+    const string prefix = "Shadow Copy Volume: ";
+    while(getline(sstr, line, '\n')) {
+        size_t pos0 = line.find(prefix);
+        if (pos0 == string::npos) continue;
+        pos0 += prefix.length();
+        vol = line.substr(pos0);
+        return RET_OK;
+    }
+    return RET_NOT_FOUND;
+}
+
+static eRetCode CreateShadowCopy(vector<sDcPartInfo>& parr) {
+    for (U32 i = 0, maxi = parr.size(); i < maxi; i++) {
+        sDcPartInfo& info = parr[i];
+        if (!info.vi.valid) continue;
+        sDcVolInfo& vi = info.vi;
+        char cmdbuffer[1024]; string output;
+
+        // create shadow copy
+        do {
+            sprintf(cmdbuffer, "wmic shadowcopy call create volume=%c:\\", vi.letter);
+            if (RET_OK != ExecCommand(string(cmdbuffer), &output)) return RET_FAIL;
+            if (RET_OK != ParseShadowID(output, vi.shaid)) return RET_FAIL;
+        } while(0);
+
+        // get shadow volume
+        do {
+            sprintf(cmdbuffer, "vssadmin list shadows /shadow=\"{%s}\"", vi.shaid.c_str());
+            if (RET_OK != ExecCommand(string(cmdbuffer), &output)) return RET_FAIL;
+            if (RET_OK != ParseShadowVolume(output, vi.shavol)) return RET_FAIL;
+        } while(0);
+
+        // remove old mount point, create the new one
+        do {
+            sprintf(cmdbuffer, "rmdir %s /Q\nmklink /d %s %s\\\n",
+                    vi.shalink.c_str(), vi.shalink.c_str(), vi.shavol.c_str());
+            if (RET_OK != ExecCommandList(string(cmdbuffer))) return RET_FAIL;
+        } while(0);
+    }
+
+    return RET_OK;
+}
+
 
 eRetCode DiskCloneUtil::HandleCloneDrive_ShadowCopy(
     CSTR& dstdrv, CSTR& srcdrv, tConstAddrArray& parr, volatile sProgress* p) {
@@ -662,8 +793,8 @@ eRetCode DiskCloneUtil::HandleCloneDrive_ShadowCopy(
 
         // Step 4. Start clone process
         if (RET_OK != InitProgress(di, p)) break;
-        if (RET_OK != CloneDataPartitions(si, di, p)) break;
-        if (RET_OK != CloneSystemPartitions(si, di, p)) break;
+        if (RET_OK != ClonePartitions(si, di, CLONE_SYS, p)) break;
+        if (RET_OK != ClonePartitions(si, di, CLONE_DATA, p)) break;
         return RET_OK;
     } while(0);
 
