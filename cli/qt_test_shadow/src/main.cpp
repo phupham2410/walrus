@@ -140,6 +140,7 @@ static eRetCode CreateShadowCopy(vector<sDcPartInfo>& parr) {
         if (!info.vi.valid) continue;
         sDcVolInfo& vi = info.vi;
 
+        // create shadow copy
         do {
             stringstream sstr; string output, id;
             sstr << "wmic shadowcopy call create volume=" << vi.letter << ":\\";
@@ -148,6 +149,7 @@ static eRetCode CreateShadowCopy(vector<sDcPartInfo>& parr) {
             if (RET_OK != ParseString_ShadowID(output, vi.shaid)) break;
         } while(0);
 
+        // get shadow volume
         do {
             stringstream sstr; string output, id;
             sstr << "vssadmin list shadows /shadow=\"{" << vi.shaid << "}\"";
@@ -157,6 +159,7 @@ static eRetCode CreateShadowCopy(vector<sDcPartInfo>& parr) {
             cout << "Result command2: " << vi.shavol << endl;
         } while(0);
 
+        // remove old mount point
         do {
             stringstream sstr; string output, id;
             sstr << "rmdir " << vi.shalink << " /Q";
@@ -164,6 +167,7 @@ static eRetCode CreateShadowCopy(vector<sDcPartInfo>& parr) {
             if (RET_OK != ExecCommand(sstr.str(), NULL)) break;
         } while(0);
 
+        // create mount point
         do {
             stringstream sstr; string output, id;
             sstr << "mklink /d " << vi.shalink << " " << vi.shavol << "\\";

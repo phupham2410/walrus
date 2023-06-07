@@ -381,82 +381,6 @@ eRetCode DiskCloneUtil::GenCreatePartScript(const sDcDriveInfo& di, std::string&
     return RET_OK;
 }
 
-eRetCode DiskCloneUtil::GenCreateShadowScript(const sDcDriveInfo& di, std::string& script) {
-    // DiskPart script:
-    // 1. create target drive: di.drvidx
-    //    diskpart
-    //    select disk dstidx
-    //    create partition primary size=?? offset=??
-    //    exit
-
-    stringstream sstr;
-    for (U32 i = 0; i < di.parr.size(); i++) {
-        const sDcPartInfo& pi = di.parr[i];
-        if (!pi.vi.valid) continue;
-        const sDcVolInfo& vi = pi.vi;
-        sstr << "wmic shadowcopy call create "
-             << "volume=\'" << vi.letter << ":\'" << endl;
-    }
-
-    script = sstr.str();
-
-    if (DBGMODE) {
-        cout << "Create shadow script: " << endl << script << endl;
-    }
-
-    return RET_OK;
-}
-
-eRetCode DiskCloneUtil::ExecShadowCopyScript(sDcDriveInfo& di) {
-
-    // Start child process, feed commands and read the result
-    // Update colume string into di
-    // shadow_id: {d855d64f-524f-4c04-84ef-ec433cadd725}
-    // shadow_vol: \\?\GLOBALROOT\Device\HarddiskVolumeShadowCopy4
-
-    // steps:
-    // start process, connect pipes
-    // send: powershell
-    // send: wmic shadowcopy call create Volume='C:\'
-    // recv:
-    //     Method execution successful.
-    //         Out Parameters:
-    //                          instance of __PARAMETERS
-    //     {
-    //         ReturnValue = 0;
-    //         ShadowID = "{0905D786-CDD4-4F21-8D0F-EB7645382BCF}";
-    //     };
-    // ==> Save "ShadowID" into di
-    // send: vssadmin list shadows /shadow="{0905D786-CDD4-4F21-8D0F-EB7645382BCF}"
-    // recv:
-    //     vssadmin 1.1 - Volume Shadow Copy Service administrative command-line tool
-    //     (C) Copyright 2001-2013 Microsoft Corp.
-    //
-    //     Contents of shadow copy set ID: {809bf920-b0a9-423e-97ec-3f3748aad7d0}
-    //       Contained 1 shadow copies at creation time: 6/4/2023 4:02:22 PM
-    //         Shadow Copy ID: {0905d786-cdd4-4f21-8d0f-eb7645382bcf}
-    //         Original Volume: (C:)\\?\Volume{639d1ccb-652d-49b9-a774-1c7b5de06c3d}\
-    //         Shadow Copy Volume: \\?\GLOBALROOT\Device\HarddiskVolumeShadowCopy5
-    //         Originating Machine: Hi
-    //         Service Machine: Hi
-    //         Provider: 'Microsoft Software Shadow Copy provider 1.0'
-    //         Type: ClientAccessible
-    //         Attributes: Persistent, Client-accessible, No auto release, No writers, Differential
-    // ==> Save "Shadow Copy Volume" into di
-    // send: exit (powershell)
-
-    // start child process and create pipes:
-
-    for (U32 i = 0; i < di.parr.size(); i++) {
-        const sDcPartInfo& pi = di.parr[i];
-        if (!pi.vi.valid) continue;
-        const sDcVolInfo& vi = pi.vi;
-
-    }
-
-    return RET_OK;
-}
-
 static string GenScriptFileName() {
     return string(tmpnam(NULL));
 }
@@ -490,7 +414,7 @@ static eRetCode ExecCommand(const string& cmdstr) {
     return RET_OK;
 }
 
-eRetCode DiskCloneUtil::ExecShCmdList(std::string& script) {
+eRetCode DiskCloneUtil::ExecCommandList(std::string& script) {
     // Start child process
     // Execute shell script
 
@@ -502,7 +426,7 @@ eRetCode DiskCloneUtil::ExecShCmdList(std::string& script) {
     return RET_OK;
 }
 
-eRetCode DiskCloneUtil::ExecDpCmdList(std::string& script) {
+eRetCode DiskCloneUtil::ExecDiskPartScript(std::string& script) {
     // Start child process
     // Execute diskpart /s script
 
@@ -685,7 +609,7 @@ eRetCode DiskCloneUtil::HandleCloneDrive_RawCopy(
         if (RET_OK != GenDestRange(si, didx, di)) break;
         if (RET_OK != RemovePartTable(didx)) break;
         if (RET_OK != GenCreatePartScript(di, script)) break;
-        if (RET_OK != ExecDpCmdList(script)) break;
+        if (RET_OK != ExecDiskPartScript(script)) break;
         if (RET_OK != VerifyPartition(didx, di)) break;
 
         // count total dst size & update progress
@@ -705,6 +629,11 @@ eRetCode DiskCloneUtil::HandleCloneDrive_RawCopy(
 // --------------------------------------------------------------------------------
 // ShadowCopy implementation
 
+
+static eRetCode CreateShadowCopy(vector<sDcPartInfo>& parr) {
+    return RET_OK;
+}
+
 eRetCode DiskCloneUtil::HandleCloneDrive_ShadowCopy(
     CSTR& dstdrv, CSTR& srcdrv, tConstAddrArray& parr, volatile sProgress* p) {
     U32 sidx, didx;
@@ -718,23 +647,23 @@ eRetCode DiskCloneUtil::HandleCloneDrive_ShadowCopy(
         if (RET_OK != GenDestRange(si, didx, di)) break;
         if (RET_OK != RemovePartTable(didx)) break;
 
-        // Make dir for target volumes
+        // Step 1. Preparation
+        //     + Create mount point for target volumes
         if (RET_OK != GenPrepareScript(di, script)) break;
-        if (RET_OK != ExecShCmdList(script)) break;
+        if (RET_OK != ExecCommandList(script)) break;
 
-        // Create partitons on target drive, mount data partitions
+        // Step 2. Create partitions on target drive
         if (RET_OK != GenCreatePartScript(di, script)) break;
-        if (RET_OK != ExecDpCmdList(script)) break;
-
-        // Create shadows objects,
-        if (RET_OK != GenCreateShadowScript(di, script)) break;
-        if (RET_OK != ExecPsCmdList(script)) break;
-
+        if (RET_OK != ExecDiskPartScript(script)) break;
         if (RET_OK != VerifyPartition(didx, di)) break;
 
-        // count total dst size & update progress
+        // Step 3. Create shadows objects
+        if (RET_OK != CreateShadowCopy(di.parr)) break;
+
+        // Step 4. Start clone process
         if (RET_OK != InitProgress(di, p)) break;
-        if (RET_OK != ClonePartitions(si, di, p)) break;
+        if (RET_OK != CloneDataPartitions(si, di, p)) break;
+        if (RET_OK != CloneSystemPartitions(si, di, p)) break;
         return RET_OK;
     } while(0);
 
