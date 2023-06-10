@@ -46,6 +46,16 @@ if (prog) { prog->progress += weight; continue; }
 
 // ----------------------------------------------------------------------------
 
+static string GenScriptBaseName() {
+    string tmp(tmpnam(NULL)); size_t len = tmp.length();
+    if (len && (tmp[len-1] == '.')) tmp.erase(len - 1);
+    return tmp;
+}
+
+static string GenScriptFileName(const string& ext) {
+    return GenScriptBaseName() + "." + ext;
+}
+
 static void UtilSetGuid(GUID& g, U32 d1, U16 d2, U16 d3, U64 d4) {
     g.Data1 = d1; g.Data2 = d2; g.Data3 = d3;
     for (int i = 7; i >= 0; i--) {
@@ -147,11 +157,11 @@ static bool ToGptPartIdString(U32 t, string& id) {
 }
 
 static void UpdateLinks(sDcVolInfo& vi) {
-    char buffer[256]; string tmp = "hk1j2kjhkds";
-    sprintf(buffer, "%c:\\shalink_%s", vi.letter, tmp.c_str());
-    vi.shalink = string(buffer);
-    sprintf(buffer, "%c:\\mntlink_%s", vi.letter, tmp.c_str());
-    vi.mntlink = string(buffer);
+    char buffer[256]; string tmp = GenScriptBaseName();
+    sprintf(buffer, ".\\shalink_%s", tmp.c_str()); vi.shalink = string(buffer);
+    sprintf(buffer, ".\\mntlink_%s", tmp.c_str()); vi.mntlink = string(buffer);
+    // sprintf(buffer, "%c:\\shalink_%s", vi.letter, tmp.c_str()); vi.shalink = string(buffer);
+    // sprintf(buffer, "%c:\\mntlink_%s", vi.letter, tmp.c_str()); vi.mntlink = string(buffer);
 }
 
 static void UpdateVolInfo(const tVolArray& va, U32 drvidx, sDcPartInfo& pi) {
@@ -383,13 +393,6 @@ eRetCode DiskCloneUtil::GenCreatePartScript(const sDcDriveInfo& di, std::string&
     return RET_OK;
 }
 
-static string GenScriptFileName(const string& ext) {
-    string tmp(tmpnam(NULL));
-    size_t len = tmp.length();
-    if (len && (tmp[len-1] != '.')) tmp += ".";
-    return tmp + ext;
-}
-
 // cmdstr: + a windows command: diskpart /s dpscript.scr
 // cmdstr: + a windows command: powershell -command "ps command"
 //         + a script file named <file>.cmd
@@ -423,10 +426,11 @@ eRetCode DiskCloneUtil::ExecCommandList(const std::string& script) {
     // Start child process
     // Execute shell script
 
-    string fname = "./" + GenScriptFileName("cmd");
+    string base = GenScriptBaseName();
+    string fname = "./" + base + ".cmd";
     ofstream fstr; fstr.open (fname);
     fstr << script << endl; fstr.close();
-    ExecCommandOnly(fname); // remove(fname.c_str());
+    ExecCommandOnly(fname); remove(fname.c_str());
     return RET_OK;
 }
 
@@ -434,9 +438,9 @@ eRetCode DiskCloneUtil::ExecDiskPartScript(const std::string& script) {
     // Start child process
     // Execute diskpart /s script
 
-    string base = GenScriptFileName("");
-    string lname = "./" + base + "log";
-    string fname = "./" + base + "scr";
+    string base = GenScriptBaseName();
+    string lname = "./" + base + ".log";
+    string fname = "./" + base + ".scr";
     ofstream fstr; fstr.open (fname);
     fstr << script << endl; fstr.close();
     stringstream cstr; cstr << "diskpart /s " << fname;
@@ -632,7 +636,7 @@ eRetCode DiskCloneUtil::ClonePartitions(
     Close(shdl); Close(dhdl);
     eRetCode ret = (i == pcnt) ? RET_OK : RET_FAIL;
 
-    FINALIZE_PROGRESS(p, ret);
+    // FINALIZE_PROGRESS(p, ret);
     return ret;
 }
 
@@ -667,6 +671,8 @@ eRetCode DiskCloneUtil::HandleCloneDrive_RawCopy(
         // count total dst size & update progress
         if (RET_OK != InitProgress(di, p)) break;
         if (RET_OK != ClonePartitions(si, di, CLONE_ALL, p)) break;
+
+        FINALIZE_PROGRESS(p, RET_OK);
         return RET_OK;
     } while(0);
 
@@ -887,6 +893,8 @@ eRetCode DiskCloneUtil::HandleCloneDrive_ShadowCopy(
 
         // Step 3. Create shadows objects
         if (RET_OK != ShadowCopy_Cleanup(di.parr)) break;
+
+        FINALIZE_PROGRESS(p, RET_OK);
         return RET_OK;
     } while(0);
 
