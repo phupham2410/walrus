@@ -1,0 +1,724 @@
+Copy-Item : Could not find a part of the path 'C:\target\Program Files\WindowsApps\MicrosoftWindows.Client.WebExperience_423.11600.0.0_x64__cw5n1h2txyewy\Dashboard\WebContent\node_modules\@babel\plugin-transform-modules-commonjs\node_mo
+dules\@babel\helper-module-transforms\lib\normalize-and-load-metadata.js'.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : WriteError: (normalize-and-load-metadata.js:FileInfo) [Copy-Item], DirectoryNotFoundException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemIOError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Could not find a part of the path 'C:\sha\Program Files\WindowsApps\MicrosoftWindows.Client.WebExperience_423.11600.0.0_x64__cw5n1h2txyewy\Dashboard\WebContent\node_modules\@babel\plugin-transform-modules-commonjs\node_modul
+es\@babel\helper-validator-identifier\scripts\generate-identifier-regex.js'.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : WriteError: (generate-identifier-regex.js:FileInfo) [Copy-Item], DirectoryNotFoundException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemIOError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Could not find a part of the path 'C:\target\Program Files\WindowsApps\MicrosoftWindows.Client.WebExperience_423.11600.0.0_x64__cw5n1h2txyewy\Dashboard\WebContent\node_modules\@babel\plugin-transform-modules-commonjs\node_mo
+dules\@babel\types\lib\builders\flow\createTypeAnnotationBasedOnTypeof.js'.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : WriteError: (createTypeAnnotationBasedOnTypeof.js:FileInfo) [Copy-Item], DirectoryNotFoundException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemIOError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Could not find a part of the path 'C:\target\Program Files\WindowsApps\MicrosoftWindows.Client.WebExperience_423.11600.0.0_x64__cw5n1h2txyewy\Dashboard\WebContent\node_modules\@babel\plugin-transform-modules-commonjs\node_mo
+dules\@babel\types\lib\modifications\typescript\removeTypeDuplicates.js'.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : WriteError: (removeTypeDuplicates.js:FileInfo) [Copy-Item], DirectoryNotFoundException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemIOError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Could not find a part of the path 'C:\target\Program Files\WindowsApps\MicrosoftWindows.Client.WebExperience_423.11600.0.0_x64__cw5n1h2txyewy\Dashboard\WebContent\node_modules\@microsoft\fast-components\node_modules\@microso
+ft\fast-foundation\dist\esm\anchored-region\anchored-region.template.js'.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : WriteError: (anchored-region.template.js:FileInfo) [Copy-Item], DirectoryNotFoundException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemIOError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Could not find a part of the path 'C:\target\Program Files\WindowsApps\MicrosoftWindows.Client.WebExperience_423.11600.0.0_x64__cw5n1h2txyewy\Dashboard\WebContent\node_modules\@microsoft\fast-components\node_modules\@microso
+ft\fast-foundation\dist\esm\breadcrumb-item\breadcrumb-item.template.js'.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : WriteError: (breadcrumb-item.template.js:FileInfo) [Copy-Item], DirectoryNotFoundException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemIOError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Could not find a part of the path 'C:\sha\Program Files\WindowsApps\MicrosoftWindows.Client.WebExperience_423.11600.0.0_x64__cw5n1h2txyewy\Dashboard\WebContent\node_modules\@microsoft\fast-components\node_modules\@microsoft\
+fast-foundation\dist\esm\horizontal-scroll\horizontal-scroll.template.js'.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : WriteError: (horizontal-scroll.template.js:FileInfo) [Copy-Item], DirectoryNotFoundException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemIOError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Could not find a part of the path 'C:\target\Program Files\WindowsApps\MicrosoftWindows.Client.WebExperience_423.11600.0.0_x64__cw5n1h2txyewy\Dashboard\WebContent\node_modules\@microsoft\fast-components\node_modules\@microso
+ft\fast-foundation\dist\esm\number-field\number-field.form-associated.js'.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : WriteError: (number-field.form-associated.js:FileInfo) [Copy-Item], DirectoryNotFoundException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemIOError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Could not find a part of the path 'C:\target\Program Files\WindowsApps\MicrosoftWindows.Client.WebExperience_423.11600.0.0_x64__cw5n1h2txyewy\Dashboard\WebContent\node_modules\@microsoft\fast-components\node_modules\@microso
+ft\fast-foundation\dist\esm\utilities\match-media-stylesheet-behavior.js'.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : WriteError: (match-media-stylesheet-behavior.js:FileInfo) [Copy-Item], DirectoryNotFoundException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemIOError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Could not find a part of the path 'C:\target\Program Files\WindowsApps\MicrosoftWindows.Client.WebExperience_423.11600.0.0_x64__cw5n1h2txyewy\Dashboard\WebContent\wwwroot\App\ClientApp\app\components\Pages\TempDisablementPag
+e\VersionComponentTextContainer\VersionComponentTextContainer.styles.d.ts'.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : WriteError: (VersionComponen...ner.styles.d.ts:FileInfo) [Copy-Item], DirectoryNotFoundException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemIOError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\All Users\Application Data' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (Application Data:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\All Users\Desktop' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (Desktop:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\All Users\Documents' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (Documents:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\All Users\Microsoft\Crypto\RSA\MachineKeys\f686aace6942fb7f7ceb231212eef4a4_df08fa9d-db45-4aa8-a5a0-551fe4bfe6e9' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (f686aace6942fb7...a0-551fe4bfe6e9:FileInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyFileInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\All Users\Microsoft\Windows\CapabilityAccessManager' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (CapabilityAccessManager:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : The process cannot access the file 'C:\sha\Users\All Users\Microsoft\Windows\LfSvc\Geofence\GeofenceApplicationID.dat' because it is being used by another process.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : WriteError: (GeofenceApplicationID.dat:FileInfo) [Copy-Item], IOException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemIOError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\All Users\Microsoft\Windows\SystemData' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (SystemData:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : The process cannot access the file 'C:\sha\Users\All Users\Microsoft\Windows Defender\IMpService77BDAF73-B396-481F-9042-AD358843EC24.lock' because it is being used by another process.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : WriteError: (IMpService77BDA...358843EC24.lock:FileInfo) [Copy-Item], IOException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemIOError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\All Users\Microsoft\Windows Defender\DLPCache\SensitiveBuffer' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (SensitiveBuffer:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : The process cannot access the file 'C:\sha\Users\All Users\Microsoft\Windows Defender\Scans\MpDiag.bin' because it is being used by another process.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : WriteError: (MpDiag.bin:FileInfo) [Copy-Item], IOException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemIOError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\All Users\Microsoft\Windows Defender\Scans\History\CacheManager\23485C77-8095-4A16-841C-4316191996D8-0.bin' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (23485C77-8095-4...6191996D8-0.bin:FileInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyFileInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\All Users\Microsoft\Windows Defender\Scans\History\CacheManager\4DA213E0-9A2D-46EA-9C00-3BD6996B7A7A-0.bin' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (4DA213E0-9A2D-4...6996B7A7A-0.bin:FileInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyFileInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\All Users\Microsoft\Windows Defender\Scans\History\CacheManager\5747F33C-EB8D-438A-BF9D-24B365614FF7-0.bin' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (5747F33C-EB8D-4...365614FF7-0.bin:FileInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyFileInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\All Users\Microsoft\Windows Defender\Scans\History\CacheManager\639D1CCB-652D-49B9-A774-1C7B5DE06C3D-1.bin' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (639D1CCB-652D-4...B5DE06C3D-1.bin:FileInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyFileInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\All Users\Microsoft\Windows Defender\Scans\History\CacheManager\FD355C62-55AA-4762-A84D-56AD3A28D75E-0.bin' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (FD355C62-55AA-4...D3A28D75E-0.bin:FileInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyFileInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\All Users\Packages\Microsoft.DesktopAppInstaller_8wekyb3d8bbwe\S-1-5-21-814794005-3008236609-3546564163-1001\SystemAppData\Helium\Cache\29c8646c52285b06.dat' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (29c8646c52285b06.dat:FileInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyFileInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\All Users\Packages\Microsoft.DesktopAppInstaller_8wekyb3d8bbwe\S-1-5-21-814794005-3008236609-3546564163-1001\SystemAppData\Helium\Cache\29c8646c52285b06_COM15.dat' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (29c8646c52285b06_COM15.dat:FileInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyFileInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\All Users\Packages\Microsoft.DesktopAppInstaller_8wekyb3d8bbwe\S-1-5-21-814794005-3008236609-3546564163-1001\SystemAppData\Helium\Cache\29c8646c52285b06_COM15.dat.LOG1' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (29c8646c52285b06_COM15.dat.LOG1:FileInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyFileInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\All Users\Packages\Microsoft.DesktopAppInstaller_8wekyb3d8bbwe\S-1-5-21-814794005-3008236609-3546564163-1001\SystemAppData\Helium\Cache\29c8646c52285b06_COM15.dat.LOG2' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (29c8646c52285b06_COM15.dat.LOG2:FileInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyFileInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\All Users\Packages\MicrosoftWindows.Client.WebExperience_cw5n1h2txyewy\S-1-5-21-814794005-3008236609-3546564163-1001\SystemAppData\Helium\Cache\59f28391e5d64a26.dat' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (59f28391e5d64a26.dat:FileInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyFileInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\All Users\Packages\MicrosoftWindows.Client.WebExperience_cw5n1h2txyewy\S-1-5-21-814794005-3008236609-3546564163-1001\SystemAppData\Helium\Cache\59f28391e5d64a26_COM15.dat' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (59f28391e5d64a26_COM15.dat:FileInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyFileInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\All Users\Packages\MicrosoftWindows.Client.WebExperience_cw5n1h2txyewy\S-1-5-21-814794005-3008236609-3546564163-1001\SystemAppData\Helium\Cache\59f28391e5d64a26_COM15.dat.LOG1' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (59f28391e5d64a26_COM15.dat.LOG1:FileInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyFileInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\All Users\Packages\MicrosoftWindows.Client.WebExperience_cw5n1h2txyewy\S-1-5-21-814794005-3008236609-3546564163-1001\SystemAppData\Helium\Cache\59f28391e5d64a26_COM15.dat.LOG2' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (59f28391e5d64a26_COM15.dat.LOG2:FileInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyFileInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\All Users\Packages\NotepadPlusPlus_7njy0v32s6xk6\S-1-5-21-814794005-3008236609-3546564163-1001\SystemAppData\Helium\Cache\f3851eb54fd8cf6f.dat' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (f3851eb54fd8cf6f.dat:FileInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyFileInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\All Users\Packages\NotepadPlusPlus_7njy0v32s6xk6\S-1-5-21-814794005-3008236609-3546564163-1001\SystemAppData\Helium\Cache\f3851eb54fd8cf6f_COM15.dat' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (f3851eb54fd8cf6f_COM15.dat:FileInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyFileInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\All Users\Packages\NotepadPlusPlus_7njy0v32s6xk6\S-1-5-21-814794005-3008236609-3546564163-1001\SystemAppData\Helium\Cache\f3851eb54fd8cf6f_COM15.dat.LOG1' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (f3851eb54fd8cf6f_COM15.dat.LOG1:FileInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyFileInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\All Users\Packages\NotepadPlusPlus_7njy0v32s6xk6\S-1-5-21-814794005-3008236609-3546564163-1001\SystemAppData\Helium\Cache\f3851eb54fd8cf6f_COM15.dat.LOG2' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (f3851eb54fd8cf6f_COM15.dat.LOG2:FileInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyFileInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\All Users\Start Menu' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (Start Menu:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\All Users\Templates' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (Templates:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\binto\AppData\Local\Application Data' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (Application Data:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\binto\AppData\Local\History' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (History:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\binto\AppData\Local\Microsoft\Windows\INetCache\Content.IE5' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (Content.IE5:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\binto\AppData\Local\Microsoft\Windows\INetCache\Low\Content.IE5' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (Content.IE5:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\binto\AppData\Local\Microsoft\Windows\Temporary Internet Files' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (Temporary Internet Files:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : The file cannot be accessed by the system.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : WriteError: (MicrosoftEdge.exe:FileInfo) [Copy-Item], IOException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemIOError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : The file cannot be accessed by the system.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : WriteError: (MicrosoftWindow...rCentennial.exe:FileInfo) [Copy-Item], IOException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemIOError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : The file cannot be accessed by the system.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : WriteError: (mspaint.exe:FileInfo) [Copy-Item], IOException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemIOError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : The file cannot be accessed by the system.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : WriteError: (pbrush.exe:FileInfo) [Copy-Item], IOException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemIOError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : The file cannot be accessed by the system.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : WriteError: (python.exe:FileInfo) [Copy-Item], IOException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemIOError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : The file cannot be accessed by the system.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : WriteError: (python3.exe:FileInfo) [Copy-Item], IOException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemIOError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : The file cannot be accessed by the system.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : WriteError: (WindowsPackageManagerServer.exe:FileInfo) [Copy-Item], IOException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemIOError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : The file cannot be accessed by the system.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : WriteError: (winget.exe:FileInfo) [Copy-Item], IOException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemIOError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : The file cannot be accessed by the system.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : WriteError: (python.exe:FileInfo) [Copy-Item], IOException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemIOError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : The file cannot be accessed by the system.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : WriteError: (python3.exe:FileInfo) [Copy-Item], IOException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemIOError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : The file cannot be accessed by the system.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : WriteError: (WindowsPackageManagerServer.exe:FileInfo) [Copy-Item], IOException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemIOError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : The file cannot be accessed by the system.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : WriteError: (winget.exe:FileInfo) [Copy-Item], IOException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemIOError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : The file cannot be accessed by the system.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : WriteError: (MicrosoftEdge.exe:FileInfo) [Copy-Item], IOException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemIOError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : The file cannot be accessed by the system.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : WriteError: (mspaint.exe:FileInfo) [Copy-Item], IOException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemIOError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : The file cannot be accessed by the system.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : WriteError: (pbrush.exe:FileInfo) [Copy-Item], IOException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemIOError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : The file cannot be accessed by the system.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : WriteError: (MicrosoftWindow...rCentennial.exe:FileInfo) [Copy-Item], IOException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemIOError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\binto\AppData\Local\Temporary Internet Files' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (Temporary Internet Files:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\binto\Application Data' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (Application Data:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\binto\Cookies' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (Cookies:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\binto\Documents\My Music' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (My Music:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\binto\Documents\My Pictures' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (My Pictures:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\binto\Documents\My Videos' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (My Videos:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\binto\Local Settings' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (Local Settings:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\binto\My Documents' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (My Documents:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\binto\NetHood' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (NetHood:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\binto\PrintHood' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (PrintHood:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\binto\Recent' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (Recent:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\binto\SendTo' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (SendTo:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\binto\Start Menu' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (Start Menu:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\binto\Templates' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (Templates:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\Default\AppData\Local\Application Data' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (Application Data:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\Default\AppData\Local\History' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (History:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\Default\AppData\Local\Microsoft\Windows\Temporary Internet Files' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (Temporary Internet Files:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\Default\AppData\Local\Temporary Internet Files' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (Temporary Internet Files:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\Default\Application Data' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (Application Data:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\Default\Cookies' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (Cookies:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\Default\Documents\My Music' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (My Music:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\Default\Documents\My Pictures' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (My Pictures:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\Default\Documents\My Videos' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (My Videos:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\Default\Local Settings' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (Local Settings:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\Default\My Documents' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (My Documents:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\Default\NetHood' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (NetHood:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\Default\PrintHood' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (PrintHood:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\Default\Recent' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (Recent:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\Default\SendTo' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (SendTo:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\Default\Start Menu' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (Start Menu:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\Default\Templates' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (Templates:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\Default User' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (Default User:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\Public\Documents\My Music' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (My Music:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\Public\Documents\My Pictures' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (My Pictures:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Users\Public\Documents\My Videos' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (My Videos:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Windows\Resources\Themes\aero\VSCache\Aero.msstyles_1033_96_01.mss' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (Aero.msstyles_1033_96_01.mss:FileInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyFileInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Windows\ServiceProfiles\LocalService\AppData\Local\Microsoft\Ngc' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (Ngc:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Windows\System32\config\systemprofile\AppData\Local\Microsoft\Windows\INetCache\Content.IE5' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (Content.IE5:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Windows\System32\LogFiles\WMI\RtBackup' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (RtBackup:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Windows\System32\Tasks\Microsoft\Windows\Security\Pwdless\IntelligentPwdlessTask' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (IntelligentPwdlessTask:FileInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyFileInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Windows\System32\WebThreatDefSvc' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (WebThreatDefSvc:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+
+Copy-Item : Access to the path 'C:\sha\Windows\SysWOW64\config\systemprofile\AppData\Local\Microsoft\Windows\INetCache\Content.IE5' is denied.
+At line:1 char:1
++ Copy-Item -Path C:\sha\* -Destination C:\target -Recurse
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (Content.IE5:DirectoryInfo) [Copy-Item], UnauthorizedAccessException
+    + FullyQualifiedErrorId : CopyDirectoryInfoItemUnauthorizedAccessError,Microsoft.PowerShell.Commands.CopyItemCommand
+	

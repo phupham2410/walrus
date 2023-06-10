@@ -1,4 +1,5 @@
 
+#include "SystemUtil.h"
 #include "CloneUtil.h"
 #include "CoreUtil.h"
 #include "FsUtil.h"
@@ -292,12 +293,12 @@ eRetCode DiskCloneUtil::GenPrepareScript(const sDcDriveInfo& di, std::string& sc
     // Prepare script:
     // 1. create mount points for target partitions
 
-    stringstream sstr;
+    stringstream sstr; U32 count = 0;
     for (U32 i = 0; i < di.parr.size(); i++) {
         const sDcPartInfo& pi = di.parr[i]; string subscr;
         if (!pi.vi.valid) continue;
-
-        sstr << "mkdir " << pi.vi.mntlink << endl;
+        if(count++) sstr << " & ";
+        sstr << "mkdir " << pi.vi.mntlink;
     }
 
     script = sstr.str();
@@ -342,6 +343,7 @@ static eRetCode GenCreatePartScript(const sDcPartInfo& d, string& script) {
     }
 
     if(d.vi.valid) {
+        sstr << endl;
         sstr << "format fs=ntfs quick" << endl;
         sstr << "assign mount=\"" << d.vi.mntlink << "\"";
     }
@@ -381,8 +383,11 @@ eRetCode DiskCloneUtil::GenCreatePartScript(const sDcDriveInfo& di, std::string&
     return RET_OK;
 }
 
-static string GenScriptFileName() {
-    return string(tmpnam(NULL));
+static string GenScriptFileName(const string& ext) {
+    string tmp(tmpnam(NULL));
+    size_t len = tmp.length();
+    if (len && (tmp[len-1] != '.')) tmp += ".";
+    return tmp + ext;
 }
 
 // cmdstr: + a windows command: diskpart /s dpscript.scr
@@ -418,11 +423,10 @@ eRetCode DiskCloneUtil::ExecCommandList(const std::string& script) {
     // Start child process
     // Execute shell script
 
-    string base = GenScriptFileName();
-    string fname = "./" + base + ".cmd";
+    string fname = "./" + GenScriptFileName("cmd");
     ofstream fstr; fstr.open (fname);
     fstr << script << endl; fstr.close();
-    ExecCommandOnly(fname); remove(fname.c_str());
+    ExecCommandOnly(fname); // remove(fname.c_str());
     return RET_OK;
 }
 
@@ -430,9 +434,9 @@ eRetCode DiskCloneUtil::ExecDiskPartScript(const std::string& script) {
     // Start child process
     // Execute diskpart /s script
 
-    string base = GenScriptFileName();
-    string lname = "./" + base + ".log";
-    string fname = "./" + base + ".scr";
+    string base = GenScriptFileName("");
+    string lname = "./" + base + "log";
+    string fname = "./" + base + "scr";
     ofstream fstr; fstr.open (fname);
     fstr << script << endl; fstr.close();
     stringstream cstr; cstr << "diskpart /s " << fname;
@@ -543,18 +547,60 @@ static eRetCode CopyPartition(
     return rem_sec ? RET_FAIL : RET_OK;
 }
 
-static eRetCode CopyShadow(const string& slnk, const string& dlnk, volatile sProgress* p) {
+static U32 ParseCopyLog(const string& str, tCopyLogMap& result) {
+    result.clear();
+
+    string log = str; string delim = "\r\n";
+    for (char c : delim)
+        log.erase(std::remove(log.begin(), log.end(), c), log.end());
+
+    const string pre0 = "Copy-Item : ";
+    const string pst0 = "At line:";
+    const string pre1 = "+ FullyQualifiedErrorId : ";
+    const string pst1 = ",Microsoft.PowerShell.Commands";
+    size_t len0 = pre0.length(), len1 = pre1.length();
+    size_t head = 0, tail;
+    while((head = log.find(pre0, head)) != string::npos) {
+        sDcShadowLog item;
+
+        head += len0;
+        if((tail = log.find(pst0, head)) == string::npos) continue;
+        item.message = log.substr(head, tail - head);
+
+        if((head = log.find(pre1, tail)) == string::npos) continue;
+        head += len1;
+
+        if((tail = log.find(pst1, head)) == string::npos) continue;
+        item.errorid = log.substr(head, tail - head);
+
+        do {
+            // extract filename from message (if any)
+            size_t pos0 = 0, pos1; string& msg = item.message;
+            if ((pos0 = msg.find("'", pos0 + 0)) == string::npos) break;
+            if ((pos1 = msg.find("'", pos0 + 1)) == string::npos) break;
+            item.filename = msg.substr(pos0, pos1 - pos0);
+        } while(0);
+
+        result[item.errorid].push_back(item);
+    }
+    return result.size();
+}
+
+eRetCode DiskCloneUtil::CopyShadow(
+    const string& slnk, const string& dlnk,
+    tCopyLogMap& reslog, volatile sProgress* p) {
+
     // copy data from link to link using CopyItem
     // string cmd = "Copy-Item -Path "C:\sha\*" -Destination "G:\" -Recurse";
     S8 cmdbuffer[1024]; string output;
     string src = "\"" + slnk + "\\*\"", dst = "\"" + dlnk + "\"";
-    sprintf(cmdbuffer, "Copy-Item -Path %s -Destination %s -Recurse", src.c_str(), dst.c_str());
+    sprintf(cmdbuffer, "powershell Copy-Item -Path %s -Destination %s -Recurse", src.c_str(), dst.c_str());
 
     // start child process to check remaining space:
-
     eRetCode ret = ExecCommand(string(cmdbuffer), &output);
 
     // parse output to get uncopied files:
+    ParseCopyLog(output, reslog);
 
     return ret;
 }
@@ -578,7 +624,8 @@ eRetCode DiskCloneUtil::ClonePartitions(
             if (RET_OK != CopyPartition(shdl, sp.start, sp.psize, dhdl, dp.start, p)) break;
         }
         else if ((code == CLONE_DATA) && sp.vi.valid) {
-            if (RET_OK != CopyShadow(sp.vi.shalink, dp.vi.mntlink,  p)) break;
+            tCopyLogMap reslog;
+            if (RET_OK != CopyShadow(sp.vi.shalink, dp.vi.mntlink, reslog, p)) break;
         }
     }
 
@@ -693,7 +740,9 @@ eRetCode DiskCloneUtil::ExecCommand(const string& cmdstr, string* rstr) {
     DWORD err = 0;
     GetExitCodeProcess( pi.hProcess, &err );
     if(err) {
-        if (DBGMODE) cout << "Execute command fail" << endl;
+        if (DBGMODE)
+            cout << "Execute command fail: "
+                << SystemUtil::GetLastErrorString() << endl;
         return RET_FAIL;
     }
 
@@ -712,6 +761,7 @@ static eRetCode ParseShadowID(const string& str, string& result) {
         pos0 += prefix.length();
         size_t pos1 = line.find(postfix);
         if (pos1 == string::npos) continue;
+        if (line[pos1 - 1] == '\r') pos1--;
         result = line.substr(pos0, pos1 - pos0);
         return RET_OK;
     }
@@ -727,12 +777,14 @@ static eRetCode ParseShadowVolume(const string& str, string& vol) {
         if (pos0 == string::npos) continue;
         pos0 += prefix.length();
         vol = line.substr(pos0);
+        size_t len = vol.length();
+        if (len && (vol[len-1] == '\r')) vol.erase(len - 1);
         return RET_OK;
     }
     return RET_NOT_FOUND;
 }
 
-static eRetCode CreateShadowCopy(vector<sDcPartInfo>& parr) {
+static eRetCode ShadowCopy_Create(vector<sDcPartInfo>& parr) {
     for (U32 i = 0, maxi = parr.size(); i < maxi; i++) {
         sDcPartInfo& info = parr[i];
         if (!info.vi.valid) continue;
@@ -752,12 +804,47 @@ static eRetCode CreateShadowCopy(vector<sDcPartInfo>& parr) {
             if (RET_OK != ExecCommand(string(cmdbuffer), &output)) return RET_FAIL;
             if (RET_OK != ParseShadowVolume(output, vi.shavol)) return RET_FAIL;
         } while(0);
+    }
+
+    return RET_OK;
+}
+
+static eRetCode ShadowCopy_MakeLink(vector<sDcPartInfo>& parr) {
+    for (U32 i = 0, maxi = parr.size(); i < maxi; i++) {
+        sDcPartInfo& info = parr[i];
+        if (!info.vi.valid) continue;
+        sDcVolInfo& vi = info.vi;
+        char cmdbuffer[1024]; string output;
 
         // remove old mount point, create the new one
         do {
-            sprintf(cmdbuffer, "rmdir %s /Q\nmklink /d %s %s\\\n",
+            sprintf(cmdbuffer, "rmdir %s /Q & mklink /d %s %s\\",
                     vi.shalink.c_str(), vi.shalink.c_str(), vi.shavol.c_str());
-            if (RET_OK != ExecCommandList(string(cmdbuffer))) return RET_FAIL;
+            if (RET_OK != ExecCommandOnly(string(cmdbuffer))) return RET_FAIL;
+        } while(0);
+    }
+
+    return RET_OK;
+}
+
+static eRetCode ShadowCopy_Cleanup(vector<sDcPartInfo>& parr) {
+    for (U32 i = 0, maxi = parr.size(); i < maxi; i++) {
+        sDcPartInfo& info = parr[i];
+        if (!info.vi.valid) continue;
+        sDcVolInfo& vi = info.vi;
+        char cmdbuffer[1024]; string output;
+
+        // get shadow volume
+        do {
+            sprintf(cmdbuffer, "vssadmin delete shadows /shadow=\"{%s}\"", vi.shaid.c_str());
+            if (RET_OK != ExecCommand(string(cmdbuffer), &output)) return RET_FAIL;
+        } while(0);
+
+        // remove old mount point, create the new one
+        do {
+            sprintf(cmdbuffer, "rmdir %s /Q & rmdir %s /Q",
+                    vi.shalink.c_str(), vi.mntlink.c_str());
+            if (RET_OK != ExecCommandOnly(string(cmdbuffer))) return RET_FAIL;
         } while(0);
     }
 
@@ -778,10 +865,12 @@ eRetCode DiskCloneUtil::HandleCloneDrive_ShadowCopy(
         if (RET_OK != GenDestRange(si, didx, di)) break;
         if (RET_OK != RemovePartTable(didx)) break;
 
+        if (RET_OK != ShadowCopy_Create(di.parr)) break;
+
         // Step 1. Preparation
         //     + Create mount point for target volumes
         if (RET_OK != GenPrepareScript(di, script)) break;
-        if (RET_OK != ExecCommandList(script)) break;
+        if (RET_OK != ExecCommandOnly(script)) break;
 
         // Step 2. Create partitions on target drive
         if (RET_OK != GenCreatePartScript(di, script)) break;
@@ -789,12 +878,15 @@ eRetCode DiskCloneUtil::HandleCloneDrive_ShadowCopy(
         if (RET_OK != VerifyPartition(didx, di)) break;
 
         // Step 3. Create shadows objects
-        if (RET_OK != CreateShadowCopy(di.parr)) break;
+        if (RET_OK != ShadowCopy_MakeLink(di.parr)) break;
 
         // Step 4. Start clone process
         if (RET_OK != InitProgress(di, p)) break;
         if (RET_OK != ClonePartitions(si, di, CLONE_SYS, p)) break;
         if (RET_OK != ClonePartitions(si, di, CLONE_DATA, p)) break;
+
+        // Step 3. Create shadows objects
+        if (RET_OK != ShadowCopy_Cleanup(di.parr)) break;
         return RET_OK;
     } while(0);
 
@@ -861,3 +953,28 @@ eRetCode DiskCloneUtil::TestCloneDrive(U32 didx, U32 sidx, U64 extsize) {
     return HandleCloneDrive_RawCopy(dstdrv, srcdrv, parr);
 }
 
+eRetCode DiskCloneUtil::TestMisc() {
+
+    string slink = "C:\\sha";
+    string dlink = "C:\\target";
+    tCopyLogMap rlog;
+    CopyShadow(slink, dlink, rlog, NULL);
+
+    for (auto &rl : rlog) {
+        cout << "Error: " << rl.first << endl;
+        for (auto &it : rl.second) {
+            if (it.filename.length()) cout << "   + File: " << it.filename;
+            else cout << "   + Message: " << it.message;
+            cout << endl;
+        }
+    }
+
+    if (0) {
+        ifstream fstr; string logfile = "../qt_test_shadow/data/shadow_copy_log.txt";
+        fstr.open(logfile, ifstream::in);
+        string content(istreambuf_iterator<char>(fstr), (istreambuf_iterator<char>()));
+        tCopyLogMap reslog;
+        ParseCopyLog(content, reslog);
+    }
+    return RET_OK;
+}

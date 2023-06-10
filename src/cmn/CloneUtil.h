@@ -62,6 +62,20 @@ namespace DiskCloneUtil { // DC
     StorageApi::eRetCode ExecCommandList(const std::string& script);
     StorageApi::eRetCode ExecDiskPartScript(const std::string& script);
 
+    struct sDcShadowLog {
+        std::string message;
+        std::string errorid;
+        std::string filename; // extracted from message
+    };
+
+    typedef std::map<std::string, std::vector<sDcShadowLog>> tCopyLogMap;
+    typedef tCopyLogMap::iterator tCopyLogMapIter;
+    typedef tCopyLogMap::const_iterator tCopyLogMapConstIter;
+
+    StorageApi::eRetCode CopyShadow(
+        const std::string& slnk, const std::string& dlnk,
+        tCopyLogMap& reslog, volatile StorageApi::sProgress* p = NULL);
+
     StorageApi::eRetCode VerifyPartition(U32 dstidx, const sDcDriveInfo& di);
 
     enum eCloneCode {
@@ -85,6 +99,7 @@ namespace DiskCloneUtil { // DC
         StorageApi::tConstAddrArray& parr, volatile StorageApi::sProgress* p = NULL);
 
     StorageApi::eRetCode TestCloneDrive(U32 dstidx, U32 srcidx, U64 extsize);
+    StorageApi::eRetCode TestMisc();
 }
 
 #endif
