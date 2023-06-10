@@ -48,7 +48,10 @@ if (prog) { prog->progress += weight; continue; }
 
 static string GenScriptBaseName() {
     string tmp(tmpnam(NULL)); size_t len = tmp.length();
-    if (len && (tmp[len-1] == '.')) tmp.erase(len - 1);
+    for (U32 i = 0; i < len; i++) {
+        char c = tmp[i];
+        if (!isalnum(c)) tmp[i] = 'a' + (c % 24);
+    }
     return tmp;
 }
 
@@ -158,10 +161,19 @@ static bool ToGptPartIdString(U32 t, string& id) {
 
 static void UpdateLinks(sDcVolInfo& vi) {
     char buffer[256]; string tmp = GenScriptBaseName();
-    sprintf(buffer, ".\\shalink_%s", tmp.c_str()); vi.shalink = string(buffer);
-    sprintf(buffer, ".\\mntlink_%s", tmp.c_str()); vi.mntlink = string(buffer);
-    // sprintf(buffer, "%c:\\shalink_%s", vi.letter, tmp.c_str()); vi.shalink = string(buffer);
-    // sprintf(buffer, "%c:\\mntlink_%s", vi.letter, tmp.c_str()); vi.mntlink = string(buffer);
+    char cwd[4096]; U32 len = sizeof(cwd); memset(cwd, 0x00, len);
+    U32 size = GetCurrentDirectoryA(len, cwd);
+
+    if (size) {
+        sprintf(buffer, "%s\\shalink_%s", cwd, tmp.c_str()); vi.shalink = string(buffer);
+        sprintf(buffer, "%s\\mntlink_%s", cwd, tmp.c_str()); vi.mntlink = string(buffer);
+
+        // sprintf(buffer, ".\\shalink_%s", tmp.c_str()); vi.shalink = string(buffer);
+        // sprintf(buffer, ".\\mntlink_%s", tmp.c_str()); vi.mntlink = string(buffer);
+    }
+
+    sprintf(buffer, "%c:\\shalink_%s", vi.letter, tmp.c_str()); vi.shalink = string(buffer);
+    sprintf(buffer, "%c:\\mntlink_%s", vi.letter, tmp.c_str()); vi.mntlink = string(buffer);
 }
 
 static void UpdateVolInfo(const tVolArray& va, U32 drvidx, sDcPartInfo& pi) {
@@ -399,6 +411,8 @@ eRetCode DiskCloneUtil::GenCreatePartScript(const sDcDriveInfo& di, std::string&
 static eRetCode ExecCommandOnly(const string& cmdstr) {
     char cmdline[ MAX_PATH];
     sprintf( cmdline, "cmd.exe /c %s", cmdstr.c_str());
+
+    cout << "## Execute command: " << cmdline << endl;
 
     PROCESS_INFORMATION pi; memset( &pi, 0, sizeof(pi));
     STARTUPINFOA si; memset( &si, 0, sizeof(si)); si.cb = sizeof(si);
@@ -713,6 +727,8 @@ eRetCode DiskCloneUtil::ExecCommand(const string& cmdstr, string* rstr) {
     char cmdline[ MAX_PATH];
     sprintf( cmdline, "cmd.exe /c %s", cmdstr.c_str());
 
+    cout << "## Executing command: " << cmdline << endl;
+
     PROCESS_INFORMATION pi; memset(&pi, 0, sizeof(pi));
     STARTUPINFOA si; memset( &si, 0, sizeof(si));
     si.cb = sizeof(si);
@@ -745,12 +761,12 @@ eRetCode DiskCloneUtil::ExecCommand(const string& cmdstr, string* rstr) {
 
     DWORD err = 0;
     GetExitCodeProcess( pi.hProcess, &err );
-    if(err) {
-        if (DBGMODE)
-            cout << "Execute command fail: "
-                << SystemUtil::GetLastErrorString() << endl;
-        return RET_FAIL;
-    }
+    // if(err) {
+    //     if (DBGMODE)
+    //         cout << "Execute command fail: "
+    //             << SystemUtil::GetLastErrorString() << endl;
+    //     return RET_FAIL;
+    // }
 
     CloseHandle( pi.hProcess );
     return RET_OK;
@@ -840,10 +856,10 @@ static eRetCode ShadowCopy_Cleanup(vector<sDcPartInfo>& parr) {
         sDcVolInfo& vi = info.vi;
         char cmdbuffer[1024]; string output;
 
-        // get shadow volume
+        // delete shadow volume
         do {
-            sprintf(cmdbuffer, "vssadmin delete shadows /shadow=\"{%s}\"", vi.shaid.c_str());
-            if (RET_OK != ExecCommand(string(cmdbuffer), &output)) return RET_FAIL;
+            sprintf(cmdbuffer, "vssadmin delete shadows /shadow=\"{%s}\" /Quiet", vi.shaid.c_str());
+            if (RET_OK != ExecCommandOnly(string(cmdbuffer))) return RET_FAIL;
         } while(0);
 
         // remove old mount point, create the new one
