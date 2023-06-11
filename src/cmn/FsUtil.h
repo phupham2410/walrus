@@ -29,6 +29,8 @@ namespace FsUtil { // FileSystem Util
     typedef std::vector<sVolDiskExtInfo> tVolArray;
 
     StorageApi::eRetCode ScanVolumeInfo(tVolArray& va);
+    void GetLetterSet(const tVolArray& va,
+        std::set<char>& used, std::set<char>& unused);
 
     // Called from StorageApi
     StorageApi::eRetCode UpdateVolumeInfo(StorageApi::tDriveArray& da);

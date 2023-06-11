@@ -24,7 +24,8 @@ namespace DiskCloneUtil { // DC
 
     struct sDcVolInfo {
         bool valid;
-        char letter; // original volume letter
+        char orgltr; // original volume letter
+        char tarltr; // target volume letter
         std::string shalink; // shadowcopy mount point
         std::string mntlink; // target volume mount point
 

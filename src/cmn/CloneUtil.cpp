@@ -161,38 +161,52 @@ static bool ToGptPartIdString(U32 t, string& id) {
 
 static void UpdateLinks(sDcVolInfo& vi) {
     char buffer[256]; string tmp = GenScriptBaseName();
-    char cwd[4096]; U32 len = sizeof(cwd); memset(cwd, 0x00, len);
-    U32 size = GetCurrentDirectoryA(len, cwd);
 
-    if (size) {
-        sprintf(buffer, "%s\\shalink_%s", cwd, tmp.c_str()); vi.shalink = string(buffer);
-        sprintf(buffer, "%s\\mntlink_%s", cwd, tmp.c_str()); vi.mntlink = string(buffer);
+    if (0) {
+        // Dont use "cwd" here, because of space character in the path
+        char cwd[4096]; U32 len = sizeof(cwd); memset(cwd, 0x00, len);
+        U32 size = GetCurrentDirectoryA(len, cwd);
+        sprintf(buffer, "%s\\%s_sha", cwd, tmp.c_str()); vi.shalink = string(buffer);
+        sprintf(buffer, "%s\\%s_mnt", cwd, tmp.c_str()); vi.mntlink = string(buffer);
 
-        // sprintf(buffer, ".\\shalink_%s", tmp.c_str()); vi.shalink = string(buffer);
-        // sprintf(buffer, ".\\mntlink_%s", tmp.c_str()); vi.mntlink = string(buffer);
     }
 
-    sprintf(buffer, "%c:\\shalink_%s", vi.letter, tmp.c_str()); vi.shalink = string(buffer);
-    sprintf(buffer, "%c:\\mntlink_%s", vi.letter, tmp.c_str()); vi.mntlink = string(buffer);
+    if (0) {
+        // Dont use "current dir" because diskpart doesn't understand
+        sprintf(buffer, ".\\%s_sha", tmp.c_str()); vi.shalink = string(buffer);
+        sprintf(buffer, ".\\%s_mnt", tmp.c_str()); vi.mntlink = string(buffer);
+    }
+
+    if (1) {
+        sprintf(buffer, ".\\%s_sha", tmp.c_str()); vi.shalink = string(buffer);
+        sprintf(buffer, "%c:\\%s_mnt", vi.orgltr, tmp.c_str()); vi.mntlink = string(buffer);
+    }
+
+    if (0) {
+        sprintf(buffer, "%c:\\%s_sha", vi.orgltr, tmp.c_str()); vi.shalink = string(buffer);
+        sprintf(buffer, "%c:\\%s_mnt", vi.orgltr, tmp.c_str()); vi.mntlink = string(buffer);
+    }
 }
 
-static void UpdateVolInfo(const tVolArray& va, U32 drvidx, sDcPartInfo& pi) {
+static void UpdateVolInfo(const tVolArray& va, set<char>& lset, U32 drvidx, sDcPartInfo& pi) {
     U64 minpos = pi.start, maxpos = minpos + pi.psize;
     sDcVolInfo& vi = pi.vi;
     U32 volcount = 0;
 
-    set<char> charset;
-
     // search for volumes in this partition on drive drvidx
     for (auto& v : va) {
-        charset.insert(v.letter);
         for (auto& d : v.di) {
             if (d.drvidx != drvidx) continue;
             if (d.offset < minpos) continue;
             if ((d.offset + d.length) > maxpos) continue;
 
             // the volume is located in this partition
-            vi.letter = v.letter; UpdateLinks(vi);
+            vi.tarltr = 0;
+            vi.orgltr = v.letter; UpdateLinks(vi);
+            if (lset.size()) {
+                set<char>::iterator first = lset.begin();
+                vi.tarltr = *first; lset.erase(first);
+            }
             volcount++; continue;
         }
     }
@@ -204,6 +218,7 @@ eRetCode DiskCloneUtil::GetDriveInfo(U32 srcidx, sDcDriveInfo& si) {
     if (RET_OK != UtilOpenFile(srcidx, hdl)) return RET_INVALID_ARG;
 
     tVolArray va; FsUtil::ScanVolumeInfo(va);
+    set<char> used, unused; FsUtil::GetLetterSet(va, used, unused);
 
     // Read DriveLayout and Partitions
     // Fill in si
@@ -228,7 +243,7 @@ eRetCode DiskCloneUtil::GetDriveInfo(U32 srcidx, sDcDriveInfo& si) {
         if (!p.PartitionNumber) continue;
         sDcPartInfo dpi;
         ConvertPartInfo(p, dpi);
-        UpdateVolInfo(va, srcidx, dpi);
+        UpdateVolInfo(va, unused, srcidx, dpi);
         si.parr.push_back(dpi);
     }
 
@@ -368,6 +383,11 @@ static eRetCode GenCreatePartScript(const sDcPartInfo& d, string& script) {
         sstr << endl;
         sstr << "format fs=ntfs quick" << endl;
         sstr << "assign mount=\"" << d.vi.mntlink << "\"";
+
+        if (0) if (d.vi.tarltr) {
+            sstr << endl;
+            sstr << "assign letter=" << d.vi.tarltr;
+        }
     }
 
     script = sstr.str();
@@ -454,16 +474,12 @@ eRetCode DiskCloneUtil::ExecDiskPartScript(const std::string& script) {
 
     string base = GenScriptBaseName();
     string lname = "./" + base + ".log";
-    string fname = "./" + base + ".scr";
+    string fname = "./" + base + ".dp";
     ofstream fstr; fstr.open (fname);
     fstr << script << endl; fstr.close();
     stringstream cstr; cstr << "diskpart /s " << fname;
     if (lname.length()) cstr << " > " << lname;
     string cmd = cstr.str();
-
-    if (DBGMODE) {
-        cout << "Script: " << fname << "; " << "Command: " << cmd << endl;
-    }
 
     ExecCommandOnly(cmd);
 
@@ -609,10 +625,10 @@ eRetCode DiskCloneUtil::CopyShadow(
     tCopyLogMap& reslog, volatile sProgress* p) {
 
     // copy data from link to link using CopyItem
-    // string cmd = "Copy-Item -Path "C:\sha\*" -Destination "G:\" -Recurse";
     S8 cmdbuffer[1024]; string output;
     string src = "\"" + slnk + "\\*\"", dst = "\"" + dlnk + "\"";
-    sprintf(cmdbuffer, "powershell Copy-Item -Path %s -Destination %s -Recurse", src.c_str(), dst.c_str());
+    sprintf(cmdbuffer, "powershell Copy-Item -Path %s -Destination %s -Recurse",
+            src.c_str(), dst.c_str());
 
     // start child process to check remaining space:
     eRetCode ret = ExecCommand(string(cmdbuffer), &output);
@@ -638,12 +654,12 @@ eRetCode DiskCloneUtil::ClonePartitions(
         const sDcPartInfo& dp = di.parr[i];
         if (DBGMODE) cout << "Copy partition " << i << endl;
 
-        if ((code == CLONE_ALL) || ((code == CLONE_SYS) && !sp.vi.valid)) {
-            if (RET_OK != CopyPartition(shdl, sp.start, sp.psize, dhdl, dp.start, p)) break;
-        }
-        else if ((code == CLONE_DATA) && sp.vi.valid) {
+        if (sp.vi.valid) { // Volume partition --> copy shadow
             tCopyLogMap reslog;
             if (RET_OK != CopyShadow(sp.vi.shalink, dp.vi.mntlink, reslog, p)) break;
+        }
+        else { // System partiton --> copy sectors
+            if (RET_OK != CopyPartition(shdl, sp.start, sp.psize, dhdl, dp.start, p)) break;
         }
     }
 
@@ -815,7 +831,7 @@ static eRetCode ShadowCopy_Create(vector<sDcPartInfo>& parr) {
 
         // create shadow copy
         do {
-            sprintf(cmdbuffer, "wmic shadowcopy call create volume=%c:\\", vi.letter);
+            sprintf(cmdbuffer, "wmic shadowcopy call create volume=%c:\\", vi.orgltr);
             if (RET_OK != ExecCommand(string(cmdbuffer), &output)) return RET_FAIL;
             if (RET_OK != ParseShadowID(output, vi.shaid)) return RET_FAIL;
         } while(0);
@@ -832,45 +848,36 @@ static eRetCode ShadowCopy_Create(vector<sDcPartInfo>& parr) {
 }
 
 static eRetCode ShadowCopy_MakeLink(vector<sDcPartInfo>& parr) {
+    stringstream sstr; U32 count = 0; char cmdbuffer[1024];
     for (U32 i = 0, maxi = parr.size(); i < maxi; i++) {
         sDcPartInfo& info = parr[i];
         if (!info.vi.valid) continue;
         sDcVolInfo& vi = info.vi;
-        char cmdbuffer[1024]; string output;
 
         // remove old mount point, create the new one
-        do {
-            sprintf(cmdbuffer, "rmdir %s /Q & mklink /d %s %s\\",
-                    vi.shalink.c_str(), vi.shalink.c_str(), vi.shavol.c_str());
-            if (RET_OK != ExecCommandOnly(string(cmdbuffer))) return RET_FAIL;
-        } while(0);
+        sprintf(cmdbuffer, "rmdir %s /Q & mklink /d %s %s\\",
+                vi.shalink.c_str(), vi.shalink.c_str(), vi.shavol.c_str());
+        if (count++) sstr << " & "; sstr << cmdbuffer;
     }
 
-    return RET_OK;
+    return ExecCommandOnly(sstr.str());
 }
 
 static eRetCode ShadowCopy_Cleanup(vector<sDcPartInfo>& parr) {
+    stringstream sstr; U32 count = 0; char cmdbuffer[1024];
     for (U32 i = 0, maxi = parr.size(); i < maxi; i++) {
         sDcPartInfo& info = parr[i];
         if (!info.vi.valid) continue;
         sDcVolInfo& vi = info.vi;
-        char cmdbuffer[1024]; string output;
 
-        // delete shadow volume
-        do {
-            sprintf(cmdbuffer, "vssadmin delete shadows /shadow=\"{%s}\" /Quiet", vi.shaid.c_str());
-            if (RET_OK != ExecCommandOnly(string(cmdbuffer))) return RET_FAIL;
-        } while(0);
-
-        // remove old mount point, create the new one
-        do {
-            sprintf(cmdbuffer, "rmdir %s /Q & rmdir %s /Q",
-                    vi.shalink.c_str(), vi.mntlink.c_str());
-            if (RET_OK != ExecCommandOnly(string(cmdbuffer))) return RET_FAIL;
-        } while(0);
+        // delete shadow copy & links
+        sprintf(cmdbuffer, "vssadmin delete shadows /shadow=\"{%s}\" /Quiet", vi.shaid.c_str());
+        if (count++) sstr << " & "; sstr << cmdbuffer;
+        sprintf(cmdbuffer, "rmdir %s /Q & rmdir %s /Q", vi.shalink.c_str(), vi.mntlink.c_str());
+        if (count++) sstr << " & "; sstr << cmdbuffer;
     }
 
-    return RET_OK;
+    return ExecCommandOnly(sstr.str());
 }
 
 
@@ -904,8 +911,7 @@ eRetCode DiskCloneUtil::HandleCloneDrive_ShadowCopy(
 
         // Step 4. Start clone process
         if (RET_OK != InitProgress(di, p)) break;
-        if (RET_OK != ClonePartitions(si, di, CLONE_SYS, p)) break;
-        if (RET_OK != ClonePartitions(si, di, CLONE_DATA, p)) break;
+        if (RET_OK != ClonePartitions(si, di, CLONE_ALL, p)) break;
 
         // Step 3. Create shadows objects
         if (RET_OK != ShadowCopy_Cleanup(di.parr)) break;

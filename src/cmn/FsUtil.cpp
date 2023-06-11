@@ -129,6 +129,13 @@ eRetCode FsUtil::ScanVolumeInfo(tVolArray& va) {
     return va.size() ? RET_OK : RET_EMPTY;
 }
 
+void FsUtil::GetLetterSet(const tVolArray& va, set<char>& used, set<char>& unused) {
+    used.clear(); unused.clear();
+    for(auto& v : va) used.insert(v.letter);
+    for (char c = 'C'; c <= 'Z'; c++)
+        if (used.find(c) == used.cend()) unused.insert(c);
+}
+
 // Update information in pi:
 static void UtilUpdatePartInfo(const tVolArray& va, U32 drvidx, sPartInfo& pi) {
     // Fill partition with volume info
