@@ -33,8 +33,9 @@ static eRetCode UtilOpenFile(const string& name, HDL& hdl) {
 // vollist format: "C:\, D:\, E:\"
 static eRetCode UtilScanVolList(vector<string>& vollist) {
     vollist.clear();
-    char vl[MAX_PATH] = {0};
-    DWORD ret = GetLogicalDriveStringsA(MAX_PATH, vl);
+    const U32 bufsize = 1024;
+    char vl[bufsize] = {0};
+    DWORD ret = GetLogicalDriveStringsA(bufsize, vl);
     if (!ret) return RET_FAIL;
 
     for (U32 c = 0, p = 0; c < ret; c++) {
@@ -72,9 +73,10 @@ static eRetCode UtilGetVolSize(const string& volname, U64& totalsize, U64& useds
 
 static eRetCode UtilGetVolumeName(char letter, wstring& volname, wstring& fsname) {
     wstring shortname = wstring(1, letter) + L":";
-    wchar_t volbuf[MAX_PATH] = {0}, fsbuf[MAX_PATH] = {0};
-    BOOL ret = GetVolumeInformationW(shortname.c_str(), volbuf, MAX_PATH,
-                                     NULL, NULL, NULL, fsbuf, MAX_PATH);
+    const U32 bufsize = 1024;
+    wchar_t volbuf[bufsize] = {0}, fsbuf[bufsize] = {0};
+    BOOL ret = GetVolumeInformationW(shortname.c_str(), volbuf, bufsize,
+                                     NULL, NULL, NULL, fsbuf, bufsize);
     if (TRUE != ret) return RET_FAIL;
     volname = wstring(volbuf);
     fsname = wstring(fsbuf);

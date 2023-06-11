@@ -177,12 +177,12 @@ static void UpdateLinks(sDcVolInfo& vi) {
         sprintf(buffer, ".\\%s_mnt", tmp.c_str()); vi.mntlink = string(buffer);
     }
 
-    if (1) {
+    if (0) {
         sprintf(buffer, ".\\%s_sha", tmp.c_str()); vi.shalink = string(buffer);
         sprintf(buffer, "%c:\\%s_mnt", vi.orgltr, tmp.c_str()); vi.mntlink = string(buffer);
     }
 
-    if (0) {
+    if (1) {
         sprintf(buffer, "%c:\\%s_sha", vi.orgltr, tmp.c_str()); vi.shalink = string(buffer);
         sprintf(buffer, "%c:\\%s_mnt", vi.orgltr, tmp.c_str()); vi.mntlink = string(buffer);
     }
@@ -207,6 +207,8 @@ static void UpdateVolInfo(const tVolArray& va, set<char>& lset, U32 drvidx, sDcP
                 set<char>::iterator first = lset.begin();
                 vi.tarltr = *first; lset.erase(first);
             }
+            vi.usedsize = v.usedsize; // this value may be larger than partition size
+                                      // in the case of expanded volume
             volcount++; continue;
         }
     }
@@ -429,7 +431,7 @@ eRetCode DiskCloneUtil::GenCreatePartScript(const sDcDriveInfo& di, std::string&
 // cmdstr: + a windows command: powershell -command "ps command"
 //         + a script file named <file>.cmd
 static eRetCode ExecCommandOnly(const string& cmdstr) {
-    char cmdline[ MAX_PATH];
+    const U32 bufsize = 4096; char cmdline[bufsize];
     sprintf( cmdline, "cmd.exe /c %s", cmdstr.c_str());
 
     cout << "## Execute command: " << cmdline << endl;
@@ -484,6 +486,17 @@ eRetCode DiskCloneUtil::ExecDiskPartScript(const std::string& script) {
     ExecCommandOnly(cmd);
 
     remove(fname.c_str()); remove(lname.c_str());
+    return RET_OK;
+}
+
+eRetCode DiskCloneUtil::ExecDiskUsageScript(const std::string& script, const std::string& logfile, string& output) {
+    // Start child process
+    // Execute diskpart /s script
+
+    ExecCommandOnly(script + " > " + logfile);
+    ifstream fstr; fstr.open(logfile, ifstream::in);
+    output.assign(istreambuf_iterator<char>(fstr), (istreambuf_iterator<char>()));
+    cout << output << endl;
     return RET_OK;
 }
 
@@ -581,6 +594,17 @@ static eRetCode CopyPartition(
     return rem_sec ? RET_FAIL : RET_OK;
 }
 
+static void DumpCopyLog(const tCopyLogMap& rlog) {
+    for (auto &rl : rlog) {
+        cout << "Error: " << rl.first << endl;
+        for (auto &it : rl.second) {
+            if (it.filename.length()) cout << "   + File: " << it.filename;
+            else cout << "   + Message: " << it.message;
+            cout << endl;
+        }
+    }
+}
+
 static U32 ParseCopyLog(const string& str, tCopyLogMap& result) {
     result.clear();
 
@@ -593,7 +617,7 @@ static U32 ParseCopyLog(const string& str, tCopyLogMap& result) {
     const string pre1 = "+ FullyQualifiedErrorId : ";
     const string pst1 = ",Microsoft.PowerShell.Commands";
     size_t len0 = pre0.length(), len1 = pre1.length();
-    size_t head = 0, tail;
+    size_t head = 0, tail, nexthead = 0;
     while((head = log.find(pre0, head)) != string::npos) {
         sDcShadowLog item;
 
@@ -616,8 +640,9 @@ static U32 ParseCopyLog(const string& str, tCopyLogMap& result) {
         } while(0);
 
         result[item.errorid].push_back(item);
+        head = tail + pst1.length(); nexthead = head - 1;
     }
-    return result.size();
+    return nexthead; // next search position in input string
 }
 
 eRetCode DiskCloneUtil::CopyShadow(
@@ -632,6 +657,108 @@ eRetCode DiskCloneUtil::CopyShadow(
 
     // start child process to check remaining space:
     eRetCode ret = ExecCommand(string(cmdbuffer), &output);
+
+    // parse output to get uncopied files:
+    ParseCopyLog(output, reslog);
+
+    return ret;
+}
+
+struct sMonitorData {
+    string srclink;
+    string dstlink;
+    volatile bool stop;
+    volatile bool done;
+    volatile sProgress* p;
+
+    U64 dstused; // current dest size in byte
+};
+
+static void ParseUsageLog(const string& str, U64& used, U64& total) {
+    stringstream sstr(str); string line, lastline;
+    const string key = "of disk in use";
+    while(getline(sstr, line, '\n')) {
+        if (line.find(key) != string::npos) {
+            lastline = line;
+        }
+    }
+    used = total = 0; // byte unit
+    string usedstr, totalstr;
+
+    size_t delimpos = lastline.find("/");
+    lastline = lastline.substr(0, delimpos);
+
+    size_t p0 = 0, p1;
+    while(1) {
+        p1 = lastline.find(",", p0);
+        if (p1 == string::npos) {
+            usedstr += lastline.substr(p0);
+            break;
+        }
+        else {
+            usedstr += lastline.substr(p0, p1 - p0);
+            p0 = p1 + 1;
+        }
+    }
+
+    used =  stoull(usedstr.c_str());
+    total =  0;
+}
+
+DWORD WINAPI MonitorThreadFunc(void* data) {
+    sMonitorData* md = (sMonitorData*) data;
+
+    U64 used, total, diff, retry = 0;
+    S8 cmdbuffer[1024]; string output;
+    sprintf(cmdbuffer, "diskusage %s", md->dstlink.c_str());
+    string logfile = "./" + GenScriptBaseName() + ".log";
+
+    while (!md->stop) {
+        // get current size of data under dstlink
+        if (0) if (RET_OK == ExecDiskUsageScript(string(cmdbuffer), logfile, output)) {
+            ParseUsageLog(output, used, total);
+            diff = used - md->dstused;
+            md->p->progress += diff >> 9;
+            md->dstused = used;
+            if (!diff) retry++; else retry = 0;
+            if (retry > 20) break; // no progress in 20 secs
+        }
+
+        if (1) {
+            U64 size_in_mb = 30;
+            md->p->progress += (size_in_mb * 1024 * 1024) >> 9;
+        }
+
+        Sleep(1000);
+    }
+    remove(logfile.c_str());
+    md->done = true; return 0;
+}
+
+eRetCode DiskCloneUtil::CopyShadowWithMonThread(
+    const string& slnk, const string& dlnk,
+    tCopyLogMap& reslog, volatile sProgress* p) {
+
+    // listing files on source drive
+    // Get-ChildItem -Recurse -Depth 2
+    // Parse and build file list
+    // for each file/dir in filelist:
+    //     Copy-Item
+
+    sMonitorData mon;
+    mon.p = p; mon.stop = mon.done = false;
+    mon.srclink = slnk; mon.dstlink = dlnk; mon.dstused = 0;
+    HANDLE handle = CreateThread(NULL, 0, MonitorThreadFunc, &mon, 0, NULL);
+
+    // copy data from link to link using CopyItem
+    S8 cmdbuffer[1024]; string output;
+    string src = "\"" + slnk + "\\*\"", dst = "\"" + dlnk + "\"";
+    sprintf(cmdbuffer, "powershell Copy-Item -Path %s -Destination %s -Recurse",
+            src.c_str(), dst.c_str());
+
+    // start child process to copy items
+    eRetCode ret = ExecCommand(string(cmdbuffer), &output);
+    mon.stop = true; while(!mon.done); CloseHandle(handle);
 
     // parse output to get uncopied files:
     ParseCopyLog(output, reslog);
@@ -656,7 +783,8 @@ eRetCode DiskCloneUtil::ClonePartitions(
 
         if (sp.vi.valid) { // Volume partition --> copy shadow
             tCopyLogMap reslog;
-            if (RET_OK != CopyShadow(sp.vi.shalink, dp.vi.mntlink, reslog, p)) break;
+            // if (RET_OK != CopyShadow(sp.vi.shalink, dp.vi.mntlink, reslog, p)) break;
+            if (RET_OK != CopyShadowWithMonThread(sp.vi.shalink, dp.vi.mntlink, reslog, p)) break;
         }
         else { // System partiton --> copy sectors
             if (RET_OK != CopyPartition(shdl, sp.start, sp.psize, dhdl, dp.start, p)) break;
@@ -675,7 +803,12 @@ static eRetCode InitProgress(const sDcDriveInfo& di, volatile sProgress* p) {
     U64 ttl_sec = 0;
     for (U32 i = 0, maxi = di.parr.size(); i < maxi; i++) {
         const sDcPartInfo& p = di.parr[i];
-        ttl_sec += p.psize >> 9;
+        if (!p.vi.valid) {
+            ttl_sec += p.psize >> 9;
+        }
+        else {
+            ttl_sec += p.vi.usedsize >> 9;
+        }
     }
 
     INIT_PROGRESS(p, ttl_sec);
@@ -739,8 +872,7 @@ eRetCode DiskCloneUtil::ExecCommand(const string& cmdstr, string* rstr) {
     }
 
     // ----------------------------------------------------------------
-
-    char cmdline[ MAX_PATH];
+    const U32 bufsize = 4096; char cmdline[bufsize];
     sprintf( cmdline, "cmd.exe /c %s", cmdstr.c_str());
 
     cout << "## Executing command: " << cmdline << endl;
@@ -765,13 +897,27 @@ eRetCode DiskCloneUtil::ExecCommand(const string& cmdstr, string* rstr) {
     }
 
     if (rstr) {
-        DWORD readsize;
+        DWORD readsize; string& res = *rstr; U32 count = 0;
         const U32 tmpsize = 1024; char tmp[tmpsize];
+        tCopyLogMap rlog;
+
         for (;;) {
             status = ReadFile(cso_rd, tmp, tmpsize, &readsize, NULL);
             if(!status || !readsize) break;
-            *rstr += string((S8*) tmp, readsize);
+            res += string((S8*) tmp, readsize);
+
+            if (res.length() > 8192) {
+                U32 nextpos = ParseCopyLog(res, rlog);
+                res = res.substr(nextpos); DumpCopyLog(rlog);
+            }
         }
+
+        if (res.length()) {
+            U32 nextpos = ParseCopyLog(res, rlog);
+            res = res.substr(nextpos); DumpCopyLog(rlog);
+        }
+
+        cout << "## Finish reading from child process" << endl;
     }
     WaitForSingleObject( pi.hProcess, INFINITE );
 

@@ -31,6 +31,8 @@ namespace DiskCloneUtil { // DC
 
         std::string shaid;  // shadow_id string
         std::string shavol; // shadow_volume string
+
+        U64 usedsize; // used size in byte unit
     };
 
     struct sDcPartInfo {
@@ -62,6 +64,7 @@ namespace DiskCloneUtil { // DC
     StorageApi::eRetCode ExecCommand(const std::string& cmdstr, std::string* rstr = NULL);
     StorageApi::eRetCode ExecCommandList(const std::string& script);
     StorageApi::eRetCode ExecDiskPartScript(const std::string& script);
+    StorageApi::eRetCode ExecDiskUsageScript(const std::string& script, const std::string& logfile, std::string& output);
 
     struct sDcShadowLog {
         std::string message;
@@ -74,6 +77,10 @@ namespace DiskCloneUtil { // DC
     typedef tCopyLogMap::const_iterator tCopyLogMapConstIter;
 
     StorageApi::eRetCode CopyShadow(
+        const std::string& slnk, const std::string& dlnk,
+        tCopyLogMap& reslog, volatile StorageApi::sProgress* p = NULL);
+
+    StorageApi::eRetCode CopyShadowWithMonThread(
         const std::string& slnk, const std::string& dlnk,
         tCopyLogMap& reslog, volatile StorageApi::sProgress* p = NULL);
 
