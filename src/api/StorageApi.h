@@ -189,6 +189,7 @@ namespace StorageApi {
                 U64 speed;   // current copying speed
                 U64 remsec;  // remaining partition ?
                 U64 remsize; // remaining data ?
+                U64 curstep;
             } clone;
 
             struct sEraseProgress {

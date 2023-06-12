@@ -93,7 +93,7 @@ namespace DiskCloneUtil { // DC
     };
 
     StorageApi::eRetCode ClonePartitions(
-        const sDcDriveInfo& si, const sDcDriveInfo& di, eCloneCode code,
+        const sDcDriveInfo& si, const sDcDriveInfo& di,
         volatile StorageApi::sProgress* p = NULL);
 
     // Called from StorageApi

@@ -812,7 +812,8 @@ void MainWindow::handleDiskCloneStart()
     std::string info = *const_cast<std::string*>(&cmn.progress.info);
     sstr << "Clone Drive Done! Return Code: "
          << StorageApi::ToString(cmn.progress.rval) << std::endl
-         << "Report: " << std::endl << info;
+         << "Report: " << std::endl << info << std::endl
+         << "CurStep: " << cmn.progress.priv.clone.curstep << std::endl;
     appendLog(cs, QString(sstr.str().c_str()));
     enableGui(true);
 }

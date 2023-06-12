@@ -715,7 +715,7 @@ DWORD WINAPI MonitorThreadFunc(void* data) {
 
     while (!md->stop) {
         // get current size of data under dstlink
-        if (0) if (RET_OK == ExecDiskUsageScript(string(cmdbuffer), logfile, output)) {
+        if (1) if (RET_OK == ExecDiskUsageScript(string(cmdbuffer), logfile, output)) {
             ParseUsageLog(output, used, total);
             diff = used - md->dstused;
             md->p->progress += diff >> 9;
@@ -724,7 +724,7 @@ DWORD WINAPI MonitorThreadFunc(void* data) {
             if (retry > 20) break; // no progress in 20 secs
         }
 
-        if (1) {
+        if (0) {
             U64 size_in_mb = 30;
             md->p->progress += (size_in_mb * 1024 * 1024) >> 9;
         }
@@ -767,7 +767,7 @@ eRetCode DiskCloneUtil::CopyShadowWithMonThread(
 }
 
 eRetCode DiskCloneUtil::ClonePartitions(
-    const sDcDriveInfo& si, const sDcDriveInfo& di, eCloneCode code, volatile sProgress* p) {
+    const sDcDriveInfo& si, const sDcDriveInfo& di, volatile sProgress* p) {
     U32 pcnt = si.parr.size();
     if (pcnt != di.parr.size()) return StorageApi::RET_INVALID_ARG;
 
@@ -783,7 +783,6 @@ eRetCode DiskCloneUtil::ClonePartitions(
 
         if (sp.vi.valid) { // Volume partition --> copy shadow
             tCopyLogMap reslog;
-            // if (RET_OK != CopyShadow(sp.vi.shalink, dp.vi.mntlink, reslog, p)) break;
             if (RET_OK != CopyShadowWithMonThread(sp.vi.shalink, dp.vi.mntlink, reslog, p)) break;
         }
         else { // System partiton --> copy sectors
@@ -833,7 +832,7 @@ eRetCode DiskCloneUtil::HandleCloneDrive_RawCopy(
 
         // count total dst size & update progress
         if (RET_OK != InitProgress(di, p)) break;
-        if (RET_OK != ClonePartitions(si, di, CLONE_ALL, p)) break;
+        if (RET_OK != ClonePartitions(si, di, p)) break;
 
         FINALIZE_PROGRESS(p, RET_OK);
         return RET_OK;
@@ -1026,6 +1025,7 @@ static eRetCode ShadowCopy_Cleanup(vector<sDcPartInfo>& parr) {
     return ExecCommandOnly(sstr.str());
 }
 
+#define SET_CURSTEP(p, v) if (p) do { p->priv.clone.curstep = v; } while(0)
 
 eRetCode DiskCloneUtil::HandleCloneDrive_ShadowCopy(
     CSTR& dstdrv, CSTR& srcdrv, tConstAddrArray& parr, volatile sProgress* p) {
@@ -1035,41 +1035,45 @@ eRetCode DiskCloneUtil::HandleCloneDrive_ShadowCopy(
 
     sDcDriveInfo si, di; string script;
     do {
-        if (RET_OK != GetDriveInfo(sidx, si)) break;
-        if (RET_OK != FilterPartition(parr, si)) break;
-        if (RET_OK != GenDestRange(si, didx, di)) break;
-        if (RET_OK != RemovePartTable(didx)) break;
+        if (RET_OK != GetDriveInfo(sidx, si))          { SET_CURSTEP(p, 10); break; }
+        if (RET_OK != FilterPartition(parr, si))       { SET_CURSTEP(p, 11); break; }
+        if (RET_OK != GenDestRange(si, didx, di))      { SET_CURSTEP(p, 12); break; }
+        if (RET_OK != RemovePartTable(didx))           { SET_CURSTEP(p, 13); break; }
 
-        if (RET_OK != ShadowCopy_Create(di.parr)) break;
+        if (RET_OK != ShadowCopy_Create(di.parr))      { SET_CURSTEP(p, 20); break; }
 
         // Step 1. Preparation
         //     + Create mount point for target volumes
-        if (RET_OK != GenPrepareScript(di, script)) break;
-        if (RET_OK != ExecCommandOnly(script)) break;
+        if (RET_OK != GenPrepareScript(di, script))    { SET_CURSTEP(p, 30); break; }
+        if (RET_OK != ExecCommandOnly(script))         { SET_CURSTEP(p, 31); break; }
 
         // Step 2. Create partitions on target drive
-        if (RET_OK != GenCreatePartScript(di, script)) break;
-        if (RET_OK != ExecDiskPartScript(script)) break;
-        if (RET_OK != VerifyPartition(didx, di)) break;
+        if (RET_OK != GenCreatePartScript(di, script)) { SET_CURSTEP(p, 40); break; }
+        if (RET_OK != ExecDiskPartScript(script))      { SET_CURSTEP(p, 41); break; }
+        if (RET_OK != VerifyPartition(didx, di))       { SET_CURSTEP(p, 42); break; }
 
         // Step 3. Create shadows objects
-        if (RET_OK != ShadowCopy_MakeLink(di.parr)) break;
+        if (RET_OK != ShadowCopy_MakeLink(di.parr))    { SET_CURSTEP(p, 50); break; }
 
         // Step 4. Start clone process
-        if (RET_OK != InitProgress(di, p)) break;
-        if (RET_OK != ClonePartitions(si, di, CLONE_ALL, p)) break;
+        if (RET_OK != InitProgress(di, p))             { SET_CURSTEP(p, 60); break; }
+        if (RET_OK != ClonePartitions(si, di, p))      { SET_CURSTEP(p, 61); break; }
 
         // Step 3. Create shadows objects
-        if (RET_OK != ShadowCopy_Cleanup(di.parr)) break;
+        if (RET_OK != ShadowCopy_Cleanup(di.parr))     { SET_CURSTEP(p, 70); break; }
 
+        SET_CURSTEP(p, 99);
         FINALIZE_PROGRESS(p, RET_OK);
         return RET_OK;
     } while(0);
 
     if (DBGMODE) cout << "FAIL" << endl;
 
-    if (p && !p->workload) {
-        INIT_PROGRESS(p, 0); FINALIZE_PROGRESS(p, RET_FAIL);
+    if (p) {
+        if (!p->workload) {
+            INIT_PROGRESS(p, 0);
+        }
+        FINALIZE_PROGRESS(p, RET_FAIL);
     }
     return RET_FAIL;
 }
