@@ -162,29 +162,10 @@ static bool ToGptPartIdString(U32 t, string& id) {
 static void UpdateLinks(sDcVolInfo& vi) {
     char buffer[256]; string tmp = GenScriptBaseName();
 
-    if (0) {
-        // Dont use "cwd" here, because of space character in the path
-        char cwd[4096]; U32 len = sizeof(cwd); memset(cwd, 0x00, len);
-        U32 size = GetCurrentDirectoryA(len, cwd);
-        sprintf(buffer, "%s\\%s_sha", cwd, tmp.c_str()); vi.shalink = string(buffer);
-        sprintf(buffer, "%s\\%s_mnt", cwd, tmp.c_str()); vi.mntlink = string(buffer);
-
-    }
-
-    if (0) {
-        // Dont use "current dir" because diskpart doesn't understand
-        sprintf(buffer, ".\\%s_sha", tmp.c_str()); vi.shalink = string(buffer);
-        sprintf(buffer, ".\\%s_mnt", tmp.c_str()); vi.mntlink = string(buffer);
-    }
-
-    if (0) {
-        sprintf(buffer, ".\\%s_sha", tmp.c_str()); vi.shalink = string(buffer);
-        sprintf(buffer, "%c:\\%s_mnt", vi.orgltr, tmp.c_str()); vi.mntlink = string(buffer);
-    }
-
     if (1) {
-        sprintf(buffer, "%c:\\%s_sha", vi.orgltr, tmp.c_str()); vi.shalink = string(buffer);
-        sprintf(buffer, "%c:\\%s_mnt", vi.orgltr, tmp.c_str()); vi.mntlink = string(buffer);
+        sprintf(buffer, "%c:\\%s", vi.orgltr, tmp.c_str()); vi.topdir = string(buffer);
+        sprintf(buffer, "%s\\sha", vi.topdir.c_str()); vi.shalink = string(buffer);
+        sprintf(buffer, "%s\\mnt", vi.topdir.c_str()); vi.mntlink = string(buffer);
     }
 }
 
@@ -264,11 +245,11 @@ static eRetCode MatchPartition(U64 addr, U64 size, const sDcDriveInfo& si, U32& 
     return RET_FAIL;
 }
 
-#define CAP1MB (1 << 20)
-#define CAP1KB (1 << 10)
-#define CAP100KB (100 << 10)
+#define CAP1MB ((U64)1 << 20)
+#define CAP1KB ((U64)1 << 10)
+#define CAP100KB ((U64)100 << 10)
 
-#define MSK1MB (~CAP1MB)
+#define MSK1MB (CAP1MB - 1)
 
 eRetCode DiskCloneUtil::FilterPartition(tConstAddrArray &parr, sDcDriveInfo& si) {
     vector<sDcPartInfo> out;
@@ -305,7 +286,7 @@ eRetCode DiskCloneUtil::GenDestRange(const sDcDriveInfo& si, U32 dstidx, sDcDriv
         start = start + (d.psize + gap);
         if (DBGMODE) {
             if (d.start & MSK1MB)
-                cout << "ERROR: Offset must be MB aligned" << endl;
+                cout << "ERROR: Offset must be MB aligned: " << d.start << endl;
         }
     }
     return di.parr.size() ? RET_OK : RET_EMPTY;
@@ -337,6 +318,8 @@ eRetCode DiskCloneUtil::GenPrepareScript(const sDcDriveInfo& di, std::string& sc
         const sDcPartInfo& pi = di.parr[i]; string subscr;
         if (!pi.vi.valid) continue;
         if(count++) sstr << " & ";
+        sstr << "mkdir " << pi.vi.topdir << " & ";
+        sstr << "attrib +H " << pi.vi.topdir << " & ";
         sstr << "mkdir " << pi.vi.mntlink;
     }
 
@@ -430,7 +413,7 @@ eRetCode DiskCloneUtil::GenCreatePartScript(const sDcDriveInfo& di, std::string&
 // cmdstr: + a windows command: diskpart /s dpscript.scr
 // cmdstr: + a windows command: powershell -command "ps command"
 //         + a script file named <file>.cmd
-static eRetCode ExecCommandOnly(const string& cmdstr) {
+eRetCode DiskCloneUtil::ExecCommandOnly(const string& cmdstr) {
     const U32 bufsize = 4096; char cmdline[bufsize];
     sprintf( cmdline, "cmd.exe /c %s", cmdstr.c_str());
 
@@ -656,7 +639,7 @@ eRetCode DiskCloneUtil::CopyShadow(
             src.c_str(), dst.c_str());
 
     // start child process to check remaining space:
-    eRetCode ret = ExecCommand(string(cmdbuffer), &output);
+    eRetCode ret = ExecCommandWithLog(string(cmdbuffer), &output);
 
     // parse output to get uncopied files:
     ParseCopyLog(output, reslog);
@@ -711,7 +694,8 @@ DWORD WINAPI MonitorThreadFunc(void* data) {
     U64 used, total, diff, retry = 0;
     S8 cmdbuffer[1024]; string output;
     sprintf(cmdbuffer, "diskusage %s", md->dstlink.c_str());
-    string logfile = "./" + GenScriptBaseName() + ".log";
+    string logfile = md->dstlink + ".log";
+    // string logfile = "./" + GenScriptBaseName() + ".log";
 
     while (!md->stop) {
         // get current size of data under dstlink
@@ -731,7 +715,7 @@ DWORD WINAPI MonitorThreadFunc(void* data) {
 
         Sleep(1000);
     }
-    remove(logfile.c_str());
+    // remove(logfile.c_str());
     md->done = true; return 0;
 }
 
@@ -757,7 +741,7 @@ eRetCode DiskCloneUtil::CopyShadowWithMonThread(
             src.c_str(), dst.c_str());
 
     // start child process to copy items
-    eRetCode ret = ExecCommand(string(cmdbuffer), &output);
+    eRetCode ret = ExecCommandWithLog(string(cmdbuffer), &output);
     mon.stop = true; while(!mon.done); CloseHandle(handle);
 
     // parse output to get uncopied files:
@@ -850,7 +834,7 @@ eRetCode DiskCloneUtil::HandleCloneDrive_RawCopy(
 // ShadowCopy implementation
 
 // Exec command in child process. Get output text in rstr
-eRetCode DiskCloneUtil::ExecCommand(const string& cmdstr, string* rstr) {
+eRetCode DiskCloneUtil::ExecCommandWithLog(const string& cmdstr, string* rstr) {
     HANDLE cso_rd = NULL; // child std out handle
     HANDLE cso_wr = NULL; // child std out handle
 
@@ -977,14 +961,14 @@ static eRetCode ShadowCopy_Create(vector<sDcPartInfo>& parr) {
         // create shadow copy
         do {
             sprintf(cmdbuffer, "wmic shadowcopy call create volume=%c:\\", vi.orgltr);
-            if (RET_OK != ExecCommand(string(cmdbuffer), &output)) return RET_FAIL;
+            if (RET_OK != ExecCommandWithLog(string(cmdbuffer), &output)) return RET_FAIL;
             if (RET_OK != ParseShadowID(output, vi.shaid)) return RET_FAIL;
         } while(0);
 
         // get shadow volume
         do {
             sprintf(cmdbuffer, "vssadmin list shadows /shadow=\"{%s}\"", vi.shaid.c_str());
-            if (RET_OK != ExecCommand(string(cmdbuffer), &output)) return RET_FAIL;
+            if (RET_OK != ExecCommandWithLog(string(cmdbuffer), &output)) return RET_FAIL;
             if (RET_OK != ParseShadowVolume(output, vi.shavol)) return RET_FAIL;
         } while(0);
     }
@@ -1000,8 +984,10 @@ static eRetCode ShadowCopy_MakeLink(vector<sDcPartInfo>& parr) {
         sDcVolInfo& vi = info.vi;
 
         // remove old mount point, create the new one
-        sprintf(cmdbuffer, "rmdir %s /Q & mklink /d %s %s\\",
-                vi.shalink.c_str(), vi.shalink.c_str(), vi.shavol.c_str());
+        sprintf(cmdbuffer, "rmdir %s /S /Q", vi.shalink.c_str());
+        if (count++) sstr << " & "; sstr << cmdbuffer;
+
+        sprintf(cmdbuffer, "mklink /d %s %s\\", vi.shalink.c_str(), vi.shavol.c_str());
         if (count++) sstr << " & "; sstr << cmdbuffer;
     }
 
@@ -1015,10 +1001,11 @@ static eRetCode ShadowCopy_Cleanup(vector<sDcPartInfo>& parr) {
         if (!info.vi.valid) continue;
         sDcVolInfo& vi = info.vi;
 
-        // delete shadow copy & links
+        // delete shadow copy & working dir
         sprintf(cmdbuffer, "vssadmin delete shadows /shadow=\"{%s}\" /Quiet", vi.shaid.c_str());
         if (count++) sstr << " & "; sstr << cmdbuffer;
-        sprintf(cmdbuffer, "rmdir %s /Q & rmdir %s /Q", vi.shalink.c_str(), vi.mntlink.c_str());
+
+        sprintf(cmdbuffer, "rmdir %s /S /Q", vi.topdir.c_str());
         if (count++) sstr << " & "; sstr << cmdbuffer;
     }
 
@@ -1066,6 +1053,8 @@ eRetCode DiskCloneUtil::HandleCloneDrive_ShadowCopy(
         FINALIZE_PROGRESS(p, RET_OK);
         return RET_OK;
     } while(0);
+
+    ShadowCopy_Cleanup(di.parr); // Force cleanup
 
     if (DBGMODE) cout << "FAIL" << endl;
 

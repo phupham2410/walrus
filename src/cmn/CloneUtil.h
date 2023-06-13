@@ -26,6 +26,7 @@ namespace DiskCloneUtil { // DC
         bool valid;
         char orgltr; // original volume letter
         char tarltr; // target volume letter
+        std::string topdir;  // top working directory
         std::string shalink; // shadowcopy mount point
         std::string mntlink; // target volume mount point
 
@@ -61,8 +62,9 @@ namespace DiskCloneUtil { // DC
     StorageApi::eRetCode GenPrepareScript(const sDcDriveInfo& di, std::string& script);
     StorageApi::eRetCode GenCreatePartScript(const sDcDriveInfo& di, std::string& script);
 
-    StorageApi::eRetCode ExecCommand(const std::string& cmdstr, std::string* rstr = NULL);
+    StorageApi::eRetCode ExecCommandOnly(const std::string& cmdstr);
     StorageApi::eRetCode ExecCommandList(const std::string& script);
+    StorageApi::eRetCode ExecCommandWithLog(const std::string& cmdstr, std::string* rstr = NULL);
     StorageApi::eRetCode ExecDiskPartScript(const std::string& script);
     StorageApi::eRetCode ExecDiskUsageScript(const std::string& script, const std::string& logfile, std::string& output);
 
