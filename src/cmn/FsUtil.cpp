@@ -87,26 +87,20 @@ static eRetCode UtilGetVolumeName(char letter, wstring& volname, wstring& fsname
 static eRetCode UtilGetVolInfo(const string& volname, sVolDiskExtInfo& vi) {
     // convert volname to "\\??\\C:"
     string newname = "\\??\\" + volname.substr(0, volname.size() - 1);
-
-    HDL hdl;
-    if (RET_OK != UtilOpenFile(newname, hdl)) return RET_FAIL;
-
-    DWORD rsize;
-    DWORD size = sizeof(VOLUME_DISK_EXTENTS) + 256 * sizeof(DISK_EXTENT);
+    HDL hdl; if (RET_OK != UtilOpenFile(newname, hdl)) return RET_FAIL;
+    DWORD rsize, size = sizeof(VOLUME_DISK_EXTENTS) + 256 * sizeof(DISK_EXTENT);
     VOLUME_DISK_EXTENTS* vd = (VOLUME_DISK_EXTENTS*)malloc(size);
     BOOL ret = DeviceIoControl((HANDLE) hdl, IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS,
                                NULL, 0, (void *)vd, size, &rsize, NULL);
     if (TRUE != ret) { free(vd); return RET_FAIL; }
-
     Close(hdl);
+    bool volstatus = (RET_OK == UtilGetVolLetter(volname, vi.letter)) &&
+                     (RET_OK == UtilGetVolumeName(vi.letter, vi.name, vi.fsname)) &&
+                     (RET_OK == UtilGetVolSize(volname, vi.totalsize, vi.usedsize, vi.freesize));
+    if (!volstatus) { free(vd); return RET_FAIL; }
 
-    U32 i, maxi = vd->NumberOfDiskExtents;
-
-    UtilGetVolLetter(volname, vi.letter);
-    UtilGetVolumeName(vi.letter, vi.name, vi.fsname);
-    UtilGetVolSize(volname, vi.totalsize, vi.usedsize, vi.freesize);
-
-    for (i = 0; i < maxi; i++) {
+    U32 maxi = vd->NumberOfDiskExtents;
+    for (U32 i = 0; i < maxi; i++) {
         DISK_EXTENT* de = &vd->Extents[i];
         sDiskExtInfo ext;
         ext.drvidx = de->DiskNumber;
@@ -114,7 +108,6 @@ static eRetCode UtilGetVolInfo(const string& volname, sVolDiskExtInfo& vi) {
         ext.length = de->ExtentLength.QuadPart;
         vi.di.push_back(ext);
     }
-
     free(vd); return RET_OK;
 }
 
