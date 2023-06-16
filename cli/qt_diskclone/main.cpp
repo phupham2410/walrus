@@ -31,18 +31,21 @@ struct sWorkerParam {
 
 DWORD WINAPI WorkerThreadFunc(void* param) {
     sWorkerParam* wp = (sWorkerParam*) param;
-    // StorageApi::CloneDrive(wp->dstdrv, wp->srcdrv, wp->parr, wp->prog);
+    StorageApi::CloneDrive(wp->dstdrv, wp->srcdrv, wp->parr, wp->prog);
 
-    // sample code on progress
-    volatile sProgress* p = wp->prog;
-    p->workload = 1000; p->progress = 0;
-    p->stop = false; p->ready = true;
-    for (U32 i = 0; i < p->workload; i++) {
-        p->progress++; Sleep(300);
-    }
-    p->done = true; p->rval = RET_OK;
+    // // sample code on progress
+    // volatile sProgress* p = wp->prog;
+    // p->workload = 1000; p->progress = 0;
+    // p->stop = false; p->ready = true;
+    // for (U32 i = 0; i < p->workload; i++) {
+    //     p->progress++; Sleep(300);
+    // }
+    // p->done = true; p->rval = RET_OK;
+
     return 0;
 }
+
+static sWorkerParam wp;
 
 eRetCode StartWorkerThread(volatile sProgress* prog)
 {
@@ -102,7 +105,8 @@ eRetCode StartWorkerThread(volatile sProgress* prog)
 
                 cout << "Selecting partition " << cur_num << " ";
                 cout << "offset: " << (offset >> 9) << " (lbas) ";
-                cout << "length: " << (length >> 9) << " (sectors) ";
+                cout << "length: " << (length >> 9) << " (sectors) "
+                                   << (length >> 20) << " (MB) ";
                 cout << endl;
             }
 
@@ -111,7 +115,6 @@ eRetCode StartWorkerThread(volatile sProgress* prog)
     }
 
     // Start thread to run disk clone:
-    sWorkerParam wp;
     wp.parr = parr; wp.prog = prog;
     wp.srcdrv = srcdrv; wp.dstdrv = dstdrv;
 
@@ -135,7 +138,7 @@ struct sProgressBar {
     }
 
     void setProgress(U32 min, U32 max) {
-        minval = min; maxval = max; curval = 0;
+        minval = min; maxval = max; curval = 0; pcnt = 0;
     }
 
     void dumpProgress() {
@@ -148,7 +151,7 @@ struct sProgressBar {
 int main(int argc, char** argv) {
     sProgressBar bar;
 
-    sProgress cp; // clone-progress
+    volatile sProgress cp; // clone-progress
     if (RET_OK != StartWorkerThread(&cp)) {
         cout << "Cannot start worker thread" << endl;
         return 1;
@@ -172,17 +175,19 @@ int main(int argc, char** argv) {
     while(!cp.done) {
         curr = cp.progress >> bitshift;
         if (prev != curr) {
-            prev = curr; bar.setProgress(curr);
+            prev = curr;
+            bar.setProgress(curr);
+            bar.dumpProgress();
         }
 
-        bar.dumpProgress();
-
         // simulate the stop activity:
-        bool stopreq = (rand() % 200) == 99;
+        bool stopreq = ((rand() % 2000000) == 99999);
         if (stopreq) {
             cp.stop = true;
             cout << endl << "User request to stop" << endl;
         }
+
+        Sleep(500); // do something here
     }
 
     cout << endl << "Done!!!!!!!" << endl;
