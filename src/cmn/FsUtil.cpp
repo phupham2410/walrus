@@ -1,9 +1,8 @@
 
 #include "FsUtil.h"
+#include "SysHeader.h"
+#include "SystemUtil.h"
 #include "CoreUtil.h"
-
-#include <windows.h>
-#include "winioctl.h"
 
 using namespace std;
 using namespace StorageApi;
@@ -54,8 +53,9 @@ static eRetCode UtilGetVolLetter(const string& volume, char& letter) {
     const char* p = volume.c_str();
     while(*p) {
         char c = *p++;
-        if (INRANGE('a', 'z', c) || INRANGE('A', 'Z', c)) {
-            letter = c; return RET_OK;
+        if (INRANGE('a', ('z' + 1), c) || INRANGE('A', ('Z' + 1), c)) {
+            letter = c;
+            return RET_OK;
         }
     }
     return RET_FAIL;
@@ -72,7 +72,7 @@ static eRetCode UtilGetVolSize(const string& volname, U64& totalsize, U64& useds
 }
 
 static eRetCode UtilGetVolumeName(char letter, wstring& volname, wstring& fsname) {
-    wstring shortname = wstring(1, letter) + L":";
+    wstring shortname = wstring(1, letter) + L":" + L"\\";
     const U32 bufsize = 1024;
     wchar_t volbuf[bufsize] = {0}, fsbuf[bufsize] = {0};
     BOOL ret = GetVolumeInformationW(shortname.c_str(), volbuf, bufsize,
@@ -135,14 +135,15 @@ void FsUtil::GetLetterSet(const tVolArray& va, set<char>& used, set<char>& unuse
 static void UtilUpdatePartInfo(const tVolArray& va, U32 drvidx, sPartInfo& pi) {
     // Fill partition with volume info
 
-    for(auto& p: pi.parr) {
+    for(auto& p: pi.parr) {      // for each partition on this drive
         U64 minpos = p.addr.first;
         U64 maxpos = minpos + (p.addr.second);
 
         // search volumes in this range
+
         bool found = false;
-        for (auto& v: va) {
-            for(auto& e: v.di) {
+        for (auto& v: va) {      // for each volume
+            for(auto& e: v.di) { // for each extent of this volume
                 if (e.drvidx != drvidx) continue;
 
                 U64 start = e.offset;

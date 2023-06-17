@@ -4,6 +4,7 @@
 #include <windows.h>
 #include <ntdddisk.h>
 #include <ntddscsi.h>
+#include <ntddstor.h>
 
 #ifdef USE_MINGW
 #include "nvme.h"

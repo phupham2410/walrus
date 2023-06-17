@@ -32,37 +32,17 @@ struct sWorkerParam {
 DWORD WINAPI WorkerThreadFunc(void* param) {
     sWorkerParam* wp = (sWorkerParam*) param;
     StorageApi::CloneDrive(wp->dstdrv, wp->srcdrv, wp->parr, wp->prog);
-
-    // // sample code on progress
-    // volatile sProgress* p = wp->prog;
-    // p->workload = 1000; p->progress = 0;
-    // p->stop = false; p->ready = true;
-    // for (U32 i = 0; i < p->workload; i++) {
-    //     p->progress++; Sleep(300);
-    // }
-    // p->done = true; p->rval = RET_OK;
-
     return 0;
 }
 
 static sWorkerParam wp;
 
-eRetCode StartWorkerThread(volatile sProgress* prog)
-{
-    // Setting source and target drives
-    string srcdrv = "\\\\.\\PhysicalDrive0";
-    string dstdrv = "\\\\.\\PhysicalDrive2";
+static eRetCode BuildPartitionInfo(
+    const string& srcdrv, const string& dstdrv,
+    const vector<U32>& partnum, U64 extsize,
+    tAddrArray& parr) {
 
-    // Select source partition number
-    // This is partition_index_number, not index in the src list
-    // use diskpart command to get value of partition index
-    U32 part_num[] = { 4, 2, 6 };
-    U32 part_cnt = sizeof(part_num) / sizeof(part_num[0]);
-
-    // User may increase size of partition on target drive
-    // this code add 100MB to partition size
-    U64 extsize = 100 << 20;
-
+    parr.clear();
 
     // Build partition param
     tDriveArray darr;
@@ -86,13 +66,11 @@ eRetCode StartWorkerThread(volatile sProgress* prog)
     }
 
     // build the address list of selected partitions
-    tAddrArray parr;
-    for (U32 i = 0; i < part_cnt; i++) {
-        U32 cur_num = part_num[i];
-
+    for (U32 i = 0, maxi = partnum.size(); i < maxi; i++) {
+        U32 pnum = partnum[i];
         for (U32 j = 0, maxj = si->pi.parr.size(); j < maxj; j++) {
             sPartition& pi = si->pi.parr[j];
-            if (pi.index != cur_num) continue;
+            if (pi.index != pnum) continue;
 
             // increase part size in target drive
             tPartAddr pa = pi.addr; pa.second += extsize;
@@ -103,29 +81,50 @@ eRetCode StartWorkerThread(volatile sProgress* prog)
                 if (offset % 512) cout << "Invalid offset (odd) " << endl;
                 if (length % 512) cout << "Invalid length (odd) " << endl;
 
-                cout << "Selecting partition " << cur_num << " ";
+                cout << "Selecting partition " << pnum << " ";
                 cout << "offset: " << (offset >> 9) << " (lbas) ";
                 cout << "length: " << (length >> 9) << " (sectors) "
-                                   << (length >> 20) << " (MB) ";
+                     << (length >> 20) << " (MB) ";
                 cout << endl;
             }
 
             break;
         }
     }
+    return RET_OK;
+}
+
+eRetCode StartWorkerThread(volatile sProgress* prog)
+{
+    // Setting source and target drives
+    string srcdrv = "\\\\.\\PhysicalDrive0";
+    string dstdrv = "\\\\.\\PhysicalDrive2";
+
+    // Select source partition number
+    // use diskpart command to get value of partition index
+    // Note: this is partition_index_number, not the index in the scanned list
+    vector<U32> partnum = { 4, 2, 6 };
+
+    // Extend sizes of all partitions
+    // User may increase the size of partition on target drive
+    // This code add 100MB to partition size
+    U64 extsize = 100 << 20;
+
+    tAddrArray parr;
+    if (RET_OK != BuildPartitionInfo(srcdrv, dstdrv, partnum, extsize, parr)) {
+        cout << "cannot build partition info" << endl;
+        return RET_FAIL;
+    }
 
     // Start thread to run disk clone:
-    wp.parr = parr; wp.prog = prog;
-    wp.srcdrv = srcdrv; wp.dstdrv = dstdrv;
-
+    wp.srcdrv = srcdrv; wp.dstdrv = dstdrv; wp.parr = parr; wp.prog = prog;
     HANDLE hdl = CreateThread(NULL, 0, WorkerThreadFunc, &wp, 0, NULL);
     if (INVALID_HANDLE_VALUE == hdl) {
         cout << "cannot start worker thread" << endl;
         return RET_FAIL;
     }
 
-    // return to manager thread.
-    // child thread is working now
+    // return to manager thread. Child thread is still working now
     return RET_OK;
 }
 
@@ -144,14 +143,20 @@ struct sProgressBar {
     void dumpProgress() {
         U32 curr = (curval - minval) * 100 / (maxval - minval);
         U32 diff = curr - pcnt; pcnt = curr;
-        if (diff) cout << string(diff, '+');
+        if (diff) {
+            cout << "\rProgress ["
+                 << string(pcnt, '>') << string(100 - pcnt, '_')
+                 << "] " << pcnt << "% "
+                 << "(" << minval << "/" << maxval << "/" << curval << ")";
+        }
     }
 };
+
+volatile sProgress cp; // clone-progress
 
 int main(int argc, char** argv) {
     sProgressBar bar;
 
-    volatile sProgress cp; // clone-progress
     if (RET_OK != StartWorkerThread(&cp)) {
         cout << "Cannot start worker thread" << endl;
         return 1;
@@ -160,36 +165,44 @@ int main(int argc, char** argv) {
     // waiting for ready
     while(!cp.ready);
 
-    // since the workload info is very large (U64),
-    // we need to normalize the range to U32
-
-    U32 bitshift = 0;
-    if ((cp.workload * 100) >> 30) {
-        bitshift = 18;
+    // since the workload info is very large U48
+    // we need to normalize the range to U32 (U30 for safe)
+    U32 bitshift = 0, maxwl = (1 << 30);
+    if (cp.workload > maxwl) {
+        bitshift = log2(cp.workload - maxwl);
     }
 
     bar.setProgress(0, cp.workload >> bitshift);
 
     // polling status
-    U64 curr, prev = cp.progress >> bitshift;
-    while(!cp.done) {
-        curr = cp.progress >> bitshift;
+    U32 curr, prev = cp.progress >> bitshift;
+
+    while(1) {
+        U64 wl = cp.workload;
+        U64 pr = cp.progress;
+
+        if (pr == wl) {
+            pr = wl;
+        }
+
+        curr = pr >> bitshift;
         if (prev != curr) {
             prev = curr;
             bar.setProgress(curr);
             bar.dumpProgress();
         }
 
-        // simulate the stop activity:
-        bool stopreq = ((rand() % 2000000) == 99999);
+        // randomize the stop activity:
+        bool stopreq = ((rand() % 99) == 99999);
         if (stopreq) {
             cp.stop = true;
             cout << endl << "User request to stop" << endl;
         }
 
+        if (cp.done) break;
         Sleep(500); // do something here
     }
 
-    cout << endl << "Done!!!!!!!" << endl;
+    cout << endl << "Done!" << endl;
     return 0;
 }

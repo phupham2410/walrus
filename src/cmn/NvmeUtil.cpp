@@ -1,5 +1,4 @@
 #include<stdlib.h>
-#include "SysHeader.h"
 #include "NvmeUtil.h"
 
 using namespace std;
@@ -428,7 +427,7 @@ BOOL NvmeUtil::win10FW_TransferFile(HANDLE hHandle, PSTORAGE_HW_FIRMWARE_INFO fw
     moreToDownload = TRUE;
 
 
-    fileHandle = CreateFileA(fwFileName,   // file to open
+    fileHandle = CreateFile(fwFileName,   // file to open
                             GENERIC_READ,          // open for reading
                             FILE_SHARE_READ,       // share for reading
                             NULL,                  // default security
@@ -598,123 +597,146 @@ BOOL NvmeUtil::win10FW_Active(HANDLE hHandle, PSTORAGE_HW_FIRMWARE_INFO fwdlInfo
 }
 
 
-BOOL NvmeUtil::GetSelfTestLog(HANDLE hdl, PNVME_DEVICE_SELF_TEST_LOG stl) {
+BOOL NvmeUtil::GetSelfTestLog(HANDLE hDevice, PNVME_DEVICE_SELF_TEST_LOG pSelfTestLog) {
+    BOOL    result = FALSE;
+    PVOID   buffer = NULL;
+    ULONG   bufferLength = 0;
+    ULONG   returnedLength = 0;
 
-    BOOL result = FALSE;
-    PVOID bufptr = NULL;
-    ULONG bufsize = 0;
-    ULONG retlen = 0;
+    PSTORAGE_PROPERTY_QUERY query = NULL;
+    PSTORAGE_PROTOCOL_SPECIFIC_DATA protocolData = NULL;
+    PSTORAGE_PROTOCOL_DATA_DESCRIPTOR protocolDataDescr = NULL;
 
-    do {
-        if (NULL == stl) break;
+    if (NULL == pSelfTestLog) {
+        printf("GetSelfTestLog: invalid input.\n");
+        goto exit;
+    }
 
-        // Allocate buffer for use.
-        bufsize = offsetof(STORAGE_PROPERTY_QUERY, AdditionalParameters)
-                  + sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA)
-                  + sizeof(NVME_DEVICE_SELF_TEST_LOG);
-        bufptr = malloc(bufsize); if (bufptr == NULL) break;
-        memset (bufptr, 0x00, bufsize);
+    // Allocate buffer for use.
+    bufferLength = offsetof(STORAGE_PROPERTY_QUERY, AdditionalParameters)
+                   + sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA)
+                   + sizeof(NVME_DEVICE_SELF_TEST_LOG);
+    buffer = malloc(bufferLength);
 
-        STORAGE_PROPERTY_QUERY* query = (STORAGE_PROPERTY_QUERY*)bufptr;
-        STORAGE_PROTOCOL_DATA_DESCRIPTOR* pdesc = (STORAGE_PROTOCOL_DATA_DESCRIPTOR*)bufptr;
-        STORAGE_PROTOCOL_SPECIFIC_DATA* pdata = (STORAGE_PROTOCOL_SPECIFIC_DATA*)query->AdditionalParameters;
+    if (buffer == NULL) {
+        printf("GetSelfTestLog: allocate buffer failed.\n");
+        goto exit;
+    }
 
-        query->PropertyId = StorageDeviceProtocolSpecificProperty;
-        query->QueryType = PropertyStandardQuery;
+    ZeroMemory(buffer, bufferLength);
 
-        pdata->ProtocolType = ProtocolTypeNvme;
-        pdata->DataType = NVMeDataTypeLogPage;
-        pdata->ProtocolDataRequestValue = NVME_LOG_PAGE_DEVICE_SELF_TEST;
-        pdata->ProtocolDataRequestSubValue = NVME_NAMESPACE_ALL;
-        pdata->ProtocolDataOffset = sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA);
-        pdata->ProtocolDataLength = sizeof(NVME_DEVICE_SELF_TEST_LOG);
+    query = (PSTORAGE_PROPERTY_QUERY)buffer;
+    protocolDataDescr = (PSTORAGE_PROTOCOL_DATA_DESCRIPTOR)buffer;
+    protocolData = (PSTORAGE_PROTOCOL_SPECIFIC_DATA)query->AdditionalParameters;
 
-        // Send request down.
-        result = DeviceIoControl(hdl, IOCTL_STORAGE_QUERY_PROPERTY,
-                                 bufptr, bufsize, bufptr, bufsize, &retlen, NULL );
-        if (!result) break;
+    query->PropertyId = StorageDeviceProtocolSpecificProperty;
+    query->QueryType = PropertyStandardQuery;
 
-        // Validate the returned data.
-        if ((pdesc->Version != sizeof(STORAGE_PROTOCOL_DATA_DESCRIPTOR)) ||
-            (pdesc->Size != sizeof(STORAGE_PROTOCOL_DATA_DESCRIPTOR))) {
-            printf("GetSelfTestLog: Data Descriptor Header is not valid.\n");
-            break;
-        }
+    protocolData->ProtocolType = ProtocolTypeNvme;
+    protocolData->DataType = NVMeDataTypeLogPage;
+    protocolData->ProtocolDataRequestValue = NVME_LOG_PAGE_DEVICE_SELF_TEST;
+    protocolData->ProtocolDataRequestSubValue = NVME_NAMESPACE_ALL;
+    protocolData->ProtocolDataOffset = sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA);
+    protocolData->ProtocolDataLength = sizeof(NVME_DEVICE_SELF_TEST_LOG);
 
-        pdata = &pdesc->ProtocolSpecificData;
+    // Send request down.
+    result = DeviceIoControl(hDevice,
+                             IOCTL_STORAGE_QUERY_PROPERTY,
+                             buffer,
+                             bufferLength,
+                             buffer,
+                             bufferLength,
+                             &returnedLength,
+                             NULL
+                             );
 
-        if ((pdata->ProtocolDataOffset < sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA)) ||
-            (pdata->ProtocolDataLength < sizeof(NVME_DEVICE_SELF_TEST_LOG))) {
-            printf("GetSelfTestLog: ProtocolData Offset/Length is not valid.\n");
-            break;
-        }
+    if (!result) goto exit;
 
-        memcpy(stl, (PCHAR)pdata + pdata->ProtocolDataOffset, sizeof(NVME_DEVICE_SELF_TEST_LOG));
+    // Validate the returned data.
+    if ((protocolDataDescr->Version != sizeof(STORAGE_PROTOCOL_DATA_DESCRIPTOR)) ||
+        (protocolDataDescr->Size != sizeof(STORAGE_PROTOCOL_DATA_DESCRIPTOR))) {
+        printf("GetSelfTestLog: Data Descriptor Header is not valid.\n");
+        result = FALSE;
+        goto exit;
+    }
 
-        result = TRUE;
-    } while(0);
+    protocolData = &protocolDataDescr->ProtocolSpecificData;
 
-    if (bufptr != NULL) free(bufptr);
+    if ((protocolData->ProtocolDataOffset < sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA)) ||
+        (protocolData->ProtocolDataLength < sizeof(NVME_DEVICE_SELF_TEST_LOG))) {
+        printf("GetSelfTestLog: ProtocolData Offset/Length is not valid.\n");
+        result = FALSE;
+        goto exit;
+    }
+
+    memcpy(pSelfTestLog, (PCHAR)protocolData + protocolData->ProtocolDataOffset, sizeof(NVME_DEVICE_SELF_TEST_LOG));
+
+    result = TRUE;
+exit:
+    if (buffer != NULL)
+    {
+        free(buffer);
+    }
+
     return result;
 }
 
 
-// BOOL NvmeUtil::DeviceSelfTest(HANDLE hdl, eSelfTestCode testcode) {
-//     BOOL  result = FALSE;
-//     PVOID buffer = NULL;
-//     ULONG bufferLength = 0;
-//     ULONG returnedLength = 0;
-//
-//     STORAGE_PROTOCOL_COMMAND* pCmd = NULL;
-//     PNVME_COMMAND pNvmeCmd;
-//
-//     // Allocate buffer for use.
-//     bufferLength = offsetof(STORAGE_PROTOCOL_COMMAND, Command) +
-//                    STORAGE_PROTOCOL_COMMAND_LENGTH_NVME;
-//     buffer = malloc(bufferLength);
-//
-//     if (buffer == NULL) {
-//         printf("DeviceSelfTest: allocate buffer failed.\n");
-//         goto exit;
-//     }
-//
-//
-//     ZeroMemory(buffer, bufferLength);
-//     pCmd = (STORAGE_PROTOCOL_COMMAND*)buffer;
-//
-//     pCmd->Length = sizeof(STORAGE_PROTOCOL_COMMAND);
-//     pCmd->Version = STORAGE_PROTOCOL_STRUCTURE_VERSION;
-//     pCmd->ProtocolType = ProtocolTypeNvme;
-//     pCmd->Flags = STORAGE_PROTOCOL_COMMAND_FLAG_ADAPTER_REQUEST;
-//     pCmd->CommandLength = STORAGE_PROTOCOL_COMMAND_LENGTH_NVME;
-//     pCmd->ErrorInfoLength = 0;
-//     pCmd->ErrorInfoOffset = 0;
-//     pCmd->DataFromDeviceBufferOffset = 0;
-//     pCmd->DataFromDeviceTransferLength = 0;
-//     pCmd->TimeOutValue = 15; // In seconds
-//     pCmd->CommandSpecific = STORAGE_PROTOCOL_SPECIFIC_NVME_ADMIN_COMMAND;
-//
-//     pNvmeCmd = (PNVME_COMMAND)pCmd->Command;
-//     pNvmeCmd->CDW0.OPC = NVME_ADMIN_COMMAND_DEVICE_SELF_TEST;
-//     pNvmeCmd->NSID = NVME_NAMESPACE_ALL;
-//     pNvmeCmd->u.GENERAL.CDW10 = testcode;
-//
-//     // Send request down.
-//     result = DeviceIoControl(hdl,
-//                              IOCTL_STORAGE_PROTOCOL_COMMAND,
-//                              buffer,
-//                              bufferLength,
-//                              buffer,
-//                              bufferLength,
-//                              &returnedLength,
-//                              NULL
-//                              );
-//
-// exit:
-//     if (buffer != NULL) {
-//         free(buffer);
-//     }
-//
-//     return result;
-// }
+BOOL NvmeUtil::DeviceSelfTest(HANDLE hDevice, eDeviceSelftestCode selftestCode) {
+    BOOL  result = FALSE;
+    PVOID buffer = NULL;
+    ULONG bufferLength = 0;
+    ULONG returnedLength = 0;
+
+    PSTORAGE_PROTOCOL_COMMAND pCmd = NULL;
+    PNVME_COMMAND pNvmeCmd;
+    // Allocate buffer for use.
+    bufferLength = offsetof(STORAGE_PROTOCOL_COMMAND, Command) +
+                   STORAGE_PROTOCOL_COMMAND_LENGTH_NVME;
+    buffer = malloc(bufferLength);
+
+    if (buffer == NULL) {
+        printf("DeviceSelfTest: allocate buffer failed.\n");
+        goto exit;
+    }
+
+
+    ZeroMemory(buffer, bufferLength);
+    pCmd = (PSTORAGE_PROTOCOL_COMMAND)buffer;
+
+    pCmd->Length = sizeof(STORAGE_PROTOCOL_COMMAND);
+    pCmd->Version = STORAGE_PROTOCOL_STRUCTURE_VERSION;
+    pCmd->ProtocolType = ProtocolTypeNvme;
+    pCmd->Flags = STORAGE_PROTOCOL_COMMAND_FLAG_ADAPTER_REQUEST;
+    pCmd->CommandLength = STORAGE_PROTOCOL_COMMAND_LENGTH_NVME;
+    pCmd->ErrorInfoLength = 0;
+    pCmd->ErrorInfoOffset = 0;
+    pCmd->DataFromDeviceBufferOffset = 0;
+    pCmd->DataFromDeviceTransferLength = 0;
+    pCmd->TimeOutValue = 15; // In seconds
+    pCmd->CommandSpecific = STORAGE_PROTOCOL_SPECIFIC_NVME_ADMIN_COMMAND;
+
+    pNvmeCmd = (PNVME_COMMAND)pCmd->Command;
+    pNvmeCmd->CDW0.OPC = NVME_ADMIN_COMMAND_DEVICE_SELF_TEST;
+    pNvmeCmd->NSID = NVME_NAMESPACE_ALL;
+    pNvmeCmd->u.GENERAL.CDW10 = selftestCode;
+
+    // Send request down.
+    result = DeviceIoControl(hDevice,
+                             IOCTL_STORAGE_PROTOCOL_COMMAND,
+                             buffer,
+                             bufferLength,
+                             buffer,
+                             bufferLength,
+                             &returnedLength,
+                             NULL
+                             );
+
+exit:
+    if (buffer != NULL) {
+        free(buffer);
+    }
+
+    return result;
+}
 

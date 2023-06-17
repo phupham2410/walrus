@@ -4,9 +4,7 @@
 #include "CoreUtil.h"
 #include "FsUtil.h"
 #include "ProcUtil.h"
-
-#include <windows.h>
-#include "winioctl.h"
+#include "SysHeader.h"
 
 using namespace std;
 using namespace FsUtil;
@@ -20,7 +18,7 @@ using namespace DiskCloneUtil;
 #include <ntdddisk.h>
 #include <processthreadsapi.h>
 
-#define DBGMODE 1
+#define DBGMODE 0
 
 // ----------------------------------------------------------------------------
 // Temporaryly put here
@@ -30,8 +28,9 @@ using namespace DiskCloneUtil;
 #define CLOSE_PROGRESS(prog)          do { if (prog) prog->done = true; } while(0)
 #define UPDATE_RETCODE(prog, code)    do { if (prog) prog->rval = code; } while(0)
 #define UPDATE_INFO(prog, infostr)    do { if (prog) prog->info = infostr; } while(0)
-#define FINALIZE_PROGRESS(prog, code) do { \
-UPDATE_RETCODE(prog, code); CLOSE_PROGRESS(prog); } while(0)
+#define FINALIZE_PROGRESS(prog, code) do { if (prog) { \
+    if (code == RET_OK) prog->progress = prog->workload; \
+    UPDATE_RETCODE(prog, code); CLOSE_PROGRESS(prog); }} while(0)
 #define RETURN_IF_STOP(prog, code)    do { if (prog && prog->stop) { \
     FINALIZE_PROGRESS(prog, code); return code; }} while(0)
 #define FINALIZE_IF_STOP(prog, code)    do { if (prog && prog->stop) { \
@@ -204,7 +203,8 @@ eRetCode DiskCloneUtil::GetDriveInfo(U32 srcidx, sDcDriveInfo& si) {
     HDL hdl;
     if (RET_OK != UtilOpenFile(srcidx, hdl)) return RET_INVALID_ARG;
 
-    tVolArray va; FsUtil::ScanVolumeInfo(va);
+    tVolArray va;
+    FsUtil::ScanVolumeInfo(va);
     set<char> used, unused; FsUtil::GetLetterSet(va, used, unused);
 
     // Read DriveLayout and Partitions
@@ -612,6 +612,7 @@ DWORD WINAPI MonitorThreadFunc(void* data) {
             if (md->p) md->p->progress += diff >> 9;
             if (!diff) retry++; else retry = 0;
         }
+
         Sleep(4000);
     }
     md->done = true; return 0;
@@ -682,12 +683,8 @@ static eRetCode InitProgress(const sDcDriveInfo& di, volatile sProgress* p) {
     U64 ttl_sec = 0;
     for (U32 i = 0, maxi = di.parr.size(); i < maxi; i++) {
         const sDcPartInfo& p = di.parr[i];
-        if (!p.vi.valid) {
-            ttl_sec += p.psize >> 9;
-        }
-        else {
-            ttl_sec += p.vi.usedsize >> 9;
-        }
+        if (!p.vi.valid) ttl_sec += p.psize >> 9; // non-data partition: full size
+        else  ttl_sec += p.vi.usedsize >> 9;      // data partition: used size only
     }
 
     INIT_PROGRESS(p, ttl_sec);
@@ -898,22 +895,4 @@ eRetCode DiskCloneUtil::TestCloneDrive(U32 didx, U32 sidx, U64 extsize) {
     }
 
     return HandleCloneDrive_ShadowCopy(dstdrv, srcdrv, parr);
-}
-
-eRetCode DiskCloneUtil::TestMisc() {
-
-    string slink = "C:\\sha";
-    string dlink = "C:\\target";
-    tCopyLogMap rlog;
-    CopyShadow(slink, dlink, rlog, NULL);
-
-    for (auto &rl : rlog) {
-        cout << "Error: " << rl.first << endl;
-        for (auto &it : rl.second) {
-            if (it.filename.length()) cout << "   + File: " << it.filename;
-            else cout << "   + Message: " << it.message;
-            cout << endl;
-        }
-    }
-    return RET_OK;
 }

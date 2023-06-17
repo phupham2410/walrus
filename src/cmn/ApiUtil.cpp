@@ -1,9 +1,7 @@
 
 #include "ApiUtil.h"
 #include "CoreUtil.h"
-
-#include <windows.h>
-#include "winioctl.h"
+#include "SysHeader.h"
 
 using namespace StorageApi;
 

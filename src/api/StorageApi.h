@@ -159,6 +159,7 @@ namespace StorageApi {
         U64 tread;          // total host read in sector
         U64 twrtn;          // total host write in sector
         U64 health;         // remaining life percentage
+        bool offline;       // online/offline status
 
         U8  bustype;        // Windows' STORAGE_BUS_TYPE
         U32 maxtfsec;       // Max transfer size in sector

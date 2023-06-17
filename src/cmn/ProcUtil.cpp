@@ -1,12 +1,10 @@
 
 #include "SystemUtil.h"
+#include "SysHeader.h"
 #include "CloneUtil.h"
 #include "CoreUtil.h"
 #include "FsUtil.h"
 #include "ProcUtil.h"
-
-#include <windows.h>
-#include "winioctl.h"
 
 using namespace std;
 using namespace FsUtil;
@@ -20,7 +18,7 @@ using namespace DiskCloneUtil;
 #include <ntdddisk.h>
 #include <processthreadsapi.h>
 
-#define DBGMODE 1
+#define DBGMODE 0
 
 // ----------------------------------------------------------------------------
 // Temporaryly put here
@@ -54,7 +52,10 @@ eRetCode ProcUtil::ExecCommandOnly(const string& cmdstr) {
     const U32 bufsize = 4096; char cmdline[bufsize];
     sprintf( cmdline, "cmd.exe /c %s", cmdstr.c_str());
 
-    cout << "## Execute command: " << cmdline << endl;
+    if (DBGMODE) {
+        cout << ">> Input: " << cmdstr << endl;
+        cout << "## Execute command: " << cmdline << endl;
+    }
 
     PROCESS_INFORMATION pi; memset( &pi, 0, sizeof(pi));
     STARTUPINFOA si; memset( &si, 0, sizeof(si)); si.cb = sizeof(si);
@@ -130,7 +131,7 @@ eRetCode ProcUtil::ExecCommand(const std::string& cmdstr,
     const U32 bufsize = 4096; char cmdline[bufsize];
     sprintf( cmdline, "cmd.exe /c %s", cmdstr.c_str());
 
-    cout << "## Executing command: " << cmdline << endl;
+    if (DBGMODE) cout << "## Executing command: " << cmdline << endl;
 
     PROCESS_INFORMATION pi; memset(&pi, 0, sizeof(pi));
     STARTUPINFOA si; memset( &si, 0, sizeof(si));
@@ -151,7 +152,7 @@ eRetCode ProcUtil::ExecCommand(const std::string& cmdstr,
         return RET_FAIL;
     }
 
-    cout << "#### Start copy-item process: pid " << pi.dwProcessId << endl;
+    if (DBGMODE) cout << "#### Start copy-item process: pid " << pi.dwProcessId << endl;
 
     if (!AssignProcessToJobObject(job, pi.hProcess)) {
         if (DBGMODE) cout << "Cannot assign child process" << endl;
@@ -169,7 +170,7 @@ eRetCode ProcUtil::ExecCommand(const std::string& cmdstr,
             if(!status || !readsize) break;
             func(priv, tmp, readsize);
         }
-        cout << "## Finish reading from child process" << endl;
+        if (DBGMODE) cout << "## Finish reading from child process" << endl;
     }
     WaitForSingleObject( pi.hProcess, INFINITE );
 
@@ -221,17 +222,19 @@ eRetCode ProcUtil::ExecDiskUsageScript(const std::string& script, const std::str
     ExecCommandOnly(script + " > " + logfile);
     ifstream fstr; fstr.open(logfile, ifstream::in);
     output.assign(istreambuf_iterator<char>(fstr), (istreambuf_iterator<char>()));
-    cout << output << endl;
+    if (DBGMODE) cout << output << endl;
     return RET_OK;
 }
 
 void ProcUtil::DumpCopyLog(const tCopyLogMap& rlog) {
-    for (auto &rl : rlog) {
-        cout << "Error: " << rl.first << endl;
-        for (auto &it : rl.second) {
-            if (it.filename.length()) cout << "   + File: " << it.filename;
-            else cout << "   + Message: " << it.message;
-            cout << endl;
+    if (DBGMODE) {
+        for (auto &rl : rlog) {
+            cout << "Error: " << rl.first << endl;
+            for (auto &it : rl.second) {
+                if (it.filename.length()) cout << "   + File: " << it.filename;
+                else cout << "   + Message: " << it.message;
+                cout << endl;
+            }
         }
     }
 }

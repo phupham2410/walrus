@@ -89,7 +89,6 @@ namespace DiskCloneUtil { // DC
         StorageApi::tConstAddrArray& parr, volatile StorageApi::sProgress* p = NULL);
 
     StorageApi::eRetCode TestCloneDrive(U32 dstidx, U32 srcidx, U64 extsize);
-    StorageApi::eRetCode TestMisc();
 }
 
 #endif

@@ -1,14 +1,11 @@
 
 #ifdef STORAGE_API_IMPL
 
-#include "windows.h"
-#include "ntddscsi.h"
-#include "winioctl.h"
-#include "ntddstor.h"
-
+#include "SysHeader.h"
 #include "ApiUtil.h"
 #include "DeviceMgr.h"
 #include "FsUtil.h"
+#include "SystemUtil.h"
 
 #include "StorageApiCmn.h"
 
@@ -45,6 +42,24 @@ static eRetCode ProcessTask(volatile sProgress* p, U32 load, eRetCode ret) {
 static void UpdateAdapterInfo(const sAdapterInfo& src, sDriveInfo& dst) {
     dst.bustype = src.BusType;
     dst.maxtfsec = src.MaxTransferSector;
+}
+
+static eRetCode UpdateDriveStatus(HDL hdl, sDriveInfo& dst) {
+    GET_DISK_ATTRIBUTES* attr; DWORD rsize;
+    const U32 bufsize = sizeof(*attr); U8 buffer[bufsize];
+    memset(buffer, 0x00, bufsize);
+
+    BOOL ret = DeviceIoControl((HANDLE) hdl, IOCTL_DISK_GET_DISK_ATTRIBUTES,
+                               NULL, 0, buffer, bufsize, &rsize, NULL);
+
+    attr = (GET_DISK_ATTRIBUTES*) buffer;
+    if (TRUE != ret) {
+        std::cout << SystemUtil::GetLastErrorString() << std::endl;
+        return RET_FAIL;
+    }
+
+    dst.offline = (attr->Attributes & DISK_ATTRIBUTE_OFFLINE);
+    return RET_OK;
 }
 
 static void CloseDevice(sPHYDRVINFO& phy) {
@@ -99,10 +114,11 @@ eRetCode StorageApi::ScanDrive(tDriveArray &darr, bool rid, bool rsm, volatile s
 
         if (ret != RET_OK) SKIP_AND_CONTINUE(p,1)
 
+        UpdateAdapterInfo(adapter, di);
+        UpdateDriveStatus(phy.DriveHandle, di);
         // --------------------------------------------------
         // accept drive
 
-        UpdateAdapterInfo(adapter, di);
         ScanPartition(phy.DriveHandle, di.pi);
         UPDATE_PROGRESS(p, 1);
 
@@ -136,6 +152,7 @@ eRetCode StorageApi::ScanPartition(HDL handle, sPartInfo &pinf) {
         PARTITION_INFORMATION_EX& item = layout->PartitionEntry[i];
 
         sPartition part;
+        part.fsinfo.valid = false;
         part.index = item.PartitionNumber;
         part.addr.first = item.StartingOffset.QuadPart;   // byte unit
         part.addr.second = item.PartitionLength.QuadPart; // byte unit
